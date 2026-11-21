@@ -76,17 +76,30 @@ export function activityShares(activity, start, end) {
 }
 
 // The histogram for a block. top(minute) gives a minute's position in pixels;
-// rows outside visibleStart..visibleEnd are left out. rowMinutes: 15 for the
+// only rows between visibleStart and visibleEnd are drawn. rowMinutes: 15 for the
 // strips in the calendar, the stored step (5) for the fine view.
-export function activityStrip(activity, { visibleStart, visibleEnd, top, rowHeight, rowMinutes, colors, className = 'activity-strip' }) {
+// A row in which no file was named ("no file loaded") is white with a black
+// outline; when that time isn't counted (excludeNoFile), it is also hatched.
+export function activityStrip(activity, {
+  visibleStart, visibleEnd, top, rowHeight, rowMinutes, colors, className = 'activity-strip', excludeNoFile = false,
+}) {
   const strip = el('div', className);
-  for (const bin of groupedBins(activity, rowMinutes)) {
-    if (bin.start < visibleStart || bin.start >= visibleEnd || bin.counts.size === 0) continue;
-    const total = [...bin.counts.values()].reduce((sum, count) => sum + count, 0);
+  const rows = new Map(groupedBins(activity, rowMinutes).map((bin) => [bin.start, bin.counts]));
+  const rowSize = Math.max(activity.binMinutes ?? 15, rowMinutes ?? 15);
+  for (let rowStart = visibleStart; rowStart < visibleEnd; rowStart += rowSize) {
+    const counts = rows.get(rowStart) ?? new Map();
     const row = el('div', 'activity-row');
-    row.style.top = `${top(bin.start)}px`;
+    row.style.top = `${top(rowStart)}px`;
     row.style.height = `${rowHeight - 1}px`;
-    for (const [group, count] of [...bin.counts].sort((a, b) => b[1] - a[1])) {
+    if (counts.size === 0) {
+      row.classList.add('empty');
+      if (excludeNoFile && noFileInQuarter(rows, rowStart, rowSize)) row.classList.add('excluded');
+      row.title = excludeNoFile ? 'No file loaded · not counted' : 'No file loaded';
+      strip.append(row);
+      continue;
+    }
+    const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
+    for (const [group, count] of [...counts].sort((a, b) => b[1] - a[1])) {
       const band = el('div');
       band.style.width = `${(count / total) * 100}%`;
       band.style.background = colors.get(group) ?? '#888780';
@@ -98,8 +111,19 @@ export function activityStrip(activity, { visibleStart, visibleEnd, top, rowHeig
   return strip;
 }
 
-// Legend: file colour, name and share of the block.
-export function activityLegend(activity, start, end, colors) {
+// Whether the whole quarter-hour around a row had no file named (only whole
+// empty quarter-hours are left out of totals).
+function noFileInQuarter(rows, rowStart, rowSize) {
+  const quarterStart = rowStart - (rowStart % 15);
+  for (let minute = quarterStart; minute < quarterStart + 15; minute += rowSize) {
+    if ((rows.get(minute)?.size ?? 0) > 0) return false;
+  }
+  return true;
+}
+
+// Legend: file colour, name and share of the block, then the time with no
+// file loaded (noFileMinutes), if any.
+export function activityLegend(activity, start, end, colors, noFileMinutes = 0, excludeNoFile = false) {
   const legend = el('div', 'activity-legend');
   for (const { name, share } of activityShares(activity, start, end)) {
     const row = el('div', 'activity-legend-row');
@@ -107,6 +131,13 @@ export function activityLegend(activity, start, end, colors) {
     swatch.style.background = colors.get(name) ?? '#888780';
     const percent = share < 0.005 ? '<1%' : `${Math.round(share * 100)}%`;
     row.append(swatch, el('span', 'activity-name', name), el('span', 'activity-share', percent));
+    legend.append(row);
+  }
+  if (noFileMinutes) {
+    const row = el('div', 'activity-legend-row');
+    const swatch = el('span', `activity-swatch no-file${excludeNoFile ? ' excluded' : ''}`);
+    const time = `${noFileMinutes} min${excludeNoFile ? ' · not counted' : ''}`;
+    row.append(swatch, el('span', 'activity-name', 'No file loaded'), el('span', 'activity-share', time));
     legend.append(row);
   }
   return legend;

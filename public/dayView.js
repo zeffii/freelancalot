@@ -4,7 +4,7 @@ import { el, labelChip, noteMarker } from './dom.js';
 import { dateKey, formatTime, formatDuration, formatLongDate } from './dates.js';
 import {
   SLOT_MINUTES, SLOTS_PER_DAY, getEntries, getLabelColor, findEntryAt, assignSlots,
-  isBlockEdge, boundaryLimits, moveBoundary, blockMoveLimits, moveBlock,
+  isBlockEdge, boundaryLimits, moveBoundary, blockMoveLimits, moveBlock, countsNoFileTime,
 } from './store.js';
 import { openLabelPopover } from './labelPopover.js';
 import { renderNotePanel } from './notePanel.js';
@@ -183,7 +183,7 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, color
       block.append(noteMarker());
       block.title = entry.note;
     }
-    if (colors && entry.activity?.files?.length) {
+    if (colors && entry.activity) {
       const blockTopMinute = start * SLOT_MINUTES;
       block.append(activityStrip(entry.activity, {
         visibleStart: start * SLOT_MINUTES,
@@ -192,6 +192,7 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, color
         rowHeight: ROW_HEIGHT,
         rowMinutes: SLOT_MINUTES,
         colors,
+        excludeNoFile: !countsNoFileTime(),
       }));
     }
     grid.append(block);

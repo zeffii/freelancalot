@@ -3,7 +3,7 @@ import {
   MONTH_NAMES, addDays, addMonths, startOfWeek, today, formatLongDate,
 } from './dates.js';
 import {
-  loadData, onChange, onSaveStatus, getStorageMode, exportJson, clearAll,
+  loadData, onChange, onSaveStatus, getStorageMode, exportJson, clearAll, countsNoFileTime, setCountNoFileTime,
 } from './store.js';
 import { renderDayView } from './dayView.js';
 import { renderWeekView, renderMonthView, renderYearView } from './calendarViews.js';
@@ -31,6 +31,8 @@ const showNotesToggle = document.getElementById('showNotesToggle');
 const showNotesCheckbox = document.getElementById('showNotesCheckbox');
 const showActivityToggle = document.getElementById('showActivityToggle');
 const showActivityCheckbox = document.getElementById('showActivityCheckbox');
+const countNoFileToggle = document.getElementById('countNoFileToggle');
+const countNoFileCheckbox = document.getElementById('countNoFileCheckbox');
 const saveStatus = document.getElementById('saveStatus');
 
 function openDay(date) {
@@ -80,6 +82,8 @@ function render() {
   fullDayToggle.style.visibility = state.view === 'day' || state.view === 'week' ? 'visible' : 'hidden';
   showNotesToggle.style.display = state.view === 'week' ? '' : 'none';
   showActivityToggle.style.display = state.view === 'day' || state.view === 'week' ? '' : 'none';
+  countNoFileToggle.style.display = state.view === 'day' || state.view === 'week' ? '' : 'none';
+  countNoFileCheckbox.checked = countsNoFileTime(); // saved with the data, applies to every total
 
   const options = {
     fullDay: state.fullDay, showNotes: state.showNotes, showActivity: state.showActivity, openDay, openMonth, rerender: render,
@@ -115,6 +119,8 @@ function wireToolbar() {
     state.date = today();
     render();
   });
+
+  countNoFileCheckbox.addEventListener('change', () => setCountNoFileTime(countNoFileCheckbox.checked));
 
   showActivityCheckbox.checked = state.showActivity;
   showActivityCheckbox.addEventListener('change', () => {

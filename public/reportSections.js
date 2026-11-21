@@ -7,7 +7,7 @@ import {
   dateKey, formatTime, formatDuration, formatHoursShort, startOfWeek, addDays,
   MONTH_NAMES, WEEKDAY_NAMES, weekdayIndex,
 } from './dates.js';
-import { getEntries, getLabelColor } from './store.js';
+import { getEntries, getLabelColor, countedMinutes, noFileSlots, noFileMinutes, countsNoFileTime } from './store.js';
 import { fileCounts, fileColors } from './activity.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -21,7 +21,8 @@ function svg(tag, attributes = {}, text = '') {
 }
 
 const shortDay = (day) => `${WEEKDAY_NAMES[weekdayIndex(day)]} ${day.getDate()} ${MONTH_NAMES[day.getMonth()].slice(0, 3)}`;
-const minutesOf = (entries) => entries.reduce((sum, entry) => sum + entry.end - entry.start, 0);
+const minutesOf = (entries) => entries.reduce((sum, entry) => sum + countedMinutes(entry), 0);
+const noFileOf = (entries) => entries.reduce((sum, entry) => sum + noFileMinutes(entry), 0);
 
 // Days with time for the chosen labels: [{ day, key, entries }]
 export function chosenDays(days, labels) {
@@ -85,7 +86,7 @@ function metricsRow(minutes, dayCount, actions) {
 
 function labelLines(entries) {
   const byLabel = new Map();
-  for (const entry of entries) byLabel.set(entry.label, (byLabel.get(entry.label) ?? 0) + entry.end - entry.start);
+  for (const entry of entries) byLabel.set(entry.label, (byLabel.get(entry.label) ?? 0) + countedMinutes(entry));
   const list = el('div', 'report-card-labels');
   for (const [label, minutes] of [...byLabel].sort((a, b) => b[1] - a[1])) {
     const line = el('div', 'report-card-label');
@@ -156,6 +157,11 @@ export function buildTimeline(items) {
   const height = top + items.length * rowHeight + 4;
   const x = (minute) => left + ((minute - first) / (last - first)) * (right - left);
   const chart = svg('svg', { viewBox: `0 0 ${width} ${height}`, class: 'report-timeline-chart', role: 'img' });
+  const pattern = svg('pattern', { id: 'no-file-hatch', width: 4, height: 4, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  pattern.append(svg('rect', { width: 4, height: 4, fill: '#fff' }), svg('line', { x1: 0, y1: 0, x2: 0, y2: 4, stroke: '#000', 'stroke-width': 0.8 }));
+  const defs = svg('defs');
+  defs.append(pattern);
+  chart.append(defs);
 
   const tickEvery = hours > 12 ? 2 : 1;
   for (let minute = first; minute <= last; minute += 60) {
@@ -175,11 +181,25 @@ export function buildTimeline(items) {
       });
       bar.append(svg('title', {}, `${entry.label} ${formatTime(entry.start)}–${formatTime(entry.end)}`));
       chart.append(bar);
+      // Quarter-hours with no file loaded: white with a black outline.
+      for (const slotStart of noFileSlots(entry)) {
+        chart.append(svg('rect', {
+          x: x(slotStart) + 0.5, y: y + 3.5, width: Math.max(1, x(slotStart + 15) - x(slotStart) - 1), height: rowHeight - 9,
+          fill: countsNoFileTime() ? '#fff' : 'url(#no-file-hatch)', stroke: '#000', 'stroke-width': 0.7,
+        }));
+      }
     }
     chart.append(svg('text', { x: width, y: y + rowHeight / 2 + 3, 'text-anchor': 'end', class: 'report-chart-text strong' }, formatHoursShort(minutesOf(entries))));
   });
 
   section.append(chart);
+  const noFile = items.reduce((sum, item) => sum + noFileOf(item.entries), 0);
+  if (noFile) {
+    const legend = el('div', 'report-timeline-legend');
+    const swatch = el('span', `report-no-file-swatch${countsNoFileTime() ? '' : ' excluded'}`);
+    legend.append(swatch, `No file loaded in Revit: ${formatDuration(noFile)}${countsNoFileTime() ? ' (counted)' : ' (not counted)'}`);
+    section.append(legend);
+  }
   return section;
 }
 
@@ -203,6 +223,8 @@ export function buildWeekSummaries(items) {
     const actions = combineActions(entries);
     card.append(metricsRow(minutesOf(entries), weekItems.length, actions), labelLines(entries));
     card.append(fileShareBar(combineFiles(entries), colors));
+    const noFile = noFileOf(entries);
+    if (noFile) card.append(el('div', 'report-count-list', `No file loaded: ${formatDuration(noFile)}${countsNoFileTime() ? '' : ' (not counted)'}`));
     for (const part of [countList('Deleted', actions?.deletes, 6), countList('Most frequent', actions?.topActions, 6)]) {
       if (part) card.append(part);
     }
@@ -230,6 +252,8 @@ export function buildDaySummaries(items) {
     }
     if (new Set(entries.map((entry) => entry.label)).size > 1) card.append(labelLines(entries));
     card.append(fileShareBar(combineFiles(entries), colors));
+    const noFile = noFileOf(entries);
+    if (noFile) card.append(el('div', 'report-count-list', `No file loaded: ${formatDuration(noFile)}${countsNoFileTime() ? '' : ' (not counted)'}`));
     const deleted = countList('Deleted', actions?.deletes, 5);
     if (deleted) card.append(deleted);
     section.append(card);

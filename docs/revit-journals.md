@@ -101,6 +101,11 @@ Saves show up as `ID_REVIT_FILE_SAVE`.
    **File activity** section expands to the 5-minute detail with each file's
    share of the block. A file keeps the same colour everywhere.
 
+   A quarter-hour in which the journal names no file — Revit open on the Home
+   screen, starting up, or between models — shows as **no file loaded**: white
+   with a black outline, listed as such in the legend and the PDF. Untick
+   **Count no-file time** to leave that time out of every total (views and PDF);
+   those quarter-hours are then hatched. The choice is saved with the timesheet.
 8. **Actions.** Revit logs every completed operation as `"Transaction Successful"`
    with its name ("Place Dimensions", "Move", "Delete Selection", …), every undo
    (`ID_EDIT_UNDO`) and, before a delete, what was selected

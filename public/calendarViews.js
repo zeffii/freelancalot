@@ -4,7 +4,9 @@ import {
   MONTH_NAMES, WEEKDAY_NAMES, dateKey, addDays, startOfWeek, daysInMonth, weekdayIndex,
   isSameDay, today, formatHoursShort, formatTime,
 } from './dates.js';
-import { SLOT_MINUTES, getEntries, getLabelColor, minutesOnDay, minutesByLabel } from './store.js';
+import {
+  SLOT_MINUTES, getEntries, getLabelColor, minutesOnDay, minutesByLabel, countsNoFileTime,
+} from './store.js';
 import { renderSummary } from './summary.js';
 import { expandFileLists } from './notePanel.js';
 import { activityStrip, fileColors } from './activity.js';
@@ -80,7 +82,7 @@ export function renderWeekView(container, date, { fullDay, showNotes, showActivi
       block.title = entry.note ? `${entry.label}\n${entry.note}` : entry.label;
       if (end - start >= 30) block.append(labelChip(entry.label));
       // File activity, when shown, takes the place of the note text (the bubble stays).
-      const withActivity = Boolean(colors && entry.activity?.files?.length);
+      const withActivity = Boolean(colors && entry.activity);
       if (withActivity) {
         block.append(activityStrip(entry.activity, {
           visibleStart: start,
@@ -89,6 +91,7 @@ export function renderWeekView(container, date, { fullDay, showNotes, showActivi
           rowHeight: WEEK_ROW_HEIGHT,
           rowMinutes: SLOT_MINUTES,
           colors,
+          excludeNoFile: !countsNoFileTime(),
         }));
       }
       if (entry.note) {

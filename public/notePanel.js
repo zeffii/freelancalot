@@ -2,7 +2,9 @@
 // selected block. Notes are plain text; URLs and [text](url) become links.
 import { el, labelChip } from './dom.js';
 import { formatTime, formatDuration } from './dates.js';
-import { getLabelColor, setNote, deleteBlock } from './store.js';
+import {
+  getLabelColor, setNote, deleteBlock, noFileMinutes, countsNoFileTime, countedMinutes,
+} from './store.js';
 import { activityStrip, activityLegend, fileColors } from './activity.js';
 
 const ACTIVITY_OPEN_SETTING = 'timesheet.activityOpen';
@@ -22,7 +24,9 @@ export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel,
   const swatch = el('span', 'note-swatch');
   swatch.style.background = getLabelColor(entry.label);
   header.append(swatch, labelChip(entry.label));
-  const range = el('div', 'muted note-range', `${formatTime(entry.start)}–${formatTime(entry.end)} · ${formatDuration(entry.end - entry.start)}`);
+  const notCounted = countsNoFileTime() ? 0 : noFileMinutes(entry);
+  const countedText = notCounted ? ` · counted ${formatDuration(countedMinutes(entry))} (${formatDuration(notCounted)} no file loaded)` : '';
+  const range = el('div', 'muted note-range', `${formatTime(entry.start)}–${formatTime(entry.end)} · ${formatDuration(entry.end - entry.start)}${countedText}`);
 
   const body = el('div', 'note-body');
   const editButton = el('button', '', 'Edit note');
@@ -81,7 +85,7 @@ export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel,
   });
 
   panel.append(header, range, body);
-  if (entry.activity?.files?.length) panel.append(activitySection(entry));
+  if (entry.activity) panel.append(activitySection(entry));
   if (entry.activity?.actions) panel.append(actionsSection(entry.activity.actions));
   panel.append(actions);
   if (startEditing) {
@@ -119,10 +123,11 @@ function activitySection(entry) {
     rowMinutes: step,
     colors,
     className: 'activity-fine',
+    excludeNoFile: !countsNoFileTime(),
   });
   strip.style.height = `${height}px`;
   chart.append(times, strip);
-  details.append(chart, activityLegend(entry.activity, entry.start, entry.end, colors));
+  details.append(chart, activityLegend(entry.activity, entry.start, entry.end, colors, noFileMinutes(entry), !countsNoFileTime()));
   return details;
 }
 

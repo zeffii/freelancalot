@@ -2,7 +2,7 @@
 // Only days with logged time for the chosen labels appear.
 import { el, labelChip } from './dom.js';
 import { addDays, dateKey, formatTime, formatDuration, formatLongDate } from './dates.js';
-import { getEntries, getLabelColor } from './store.js';
+import { getEntries, getLabelColor, countedMinutes, countsNoFileTime, noFileMinutes } from './store.js';
 import { renderNoteText } from './notePanel.js';
 import { chosenDays, buildTimeline, buildWeekSummaries, buildDaySummaries } from './reportSections.js';
 
@@ -22,7 +22,7 @@ export function labelTotalsInRange(fromDate, toDate) {
   const totals = new Map();
   for (const day of daysInRange(fromDate, toDate)) {
     for (const entry of getEntries(dateKey(day))) {
-      totals.set(entry.label, (totals.get(entry.label) ?? 0) + entry.end - entry.start);
+      totals.set(entry.label, (totals.get(entry.label) ?? 0) + countedMinutes(entry));
     }
   }
   return new Map([...totals].sort((a, b) => b[1] - a[1]));
@@ -51,6 +51,13 @@ export function buildReport({ fromDate, toDate, labels, includeNotes, sections =
     report.append(buildLabelSection(label, totals.get(label), fromDate, toDate, includeNotes));
   }
   return report;
+}
+
+// A block's counted time; when no-file time is left out, says how much.
+function durationText(entry) {
+  const text = formatDuration(countedMinutes(entry));
+  const left = countsNoFileTime() ? 0 : noFileMinutes(entry);
+  return left ? `${text} (${formatDuration(left)} no file loaded, not counted)` : text;
 }
 
 function labelCell(label) {
@@ -112,7 +119,7 @@ function buildLabelSection(label, labelMinutes, fromDate, toDate, includeNotes) 
       const cells = [
         index === 0 ? formatLongDate(day) : '',
         `${formatTime(entry.start)}–${formatTime(entry.end)}`,
-        formatDuration(entry.end - entry.start),
+        durationText(entry),
       ];
       if (includeNotes) {
         const noteCell = el('td', 'report-note');
@@ -123,7 +130,7 @@ function buildLabelSection(label, labelMinutes, fromDate, toDate, includeNotes) 
     });
 
     if (blocks.length > 1) {
-      const dayMinutes = blocks.reduce((sum, entry) => sum + entry.end - entry.start, 0);
+      const dayMinutes = blocks.reduce((sum, entry) => sum + countedMinutes(entry), 0);
       const cells = ['', 'Day total', formatDuration(dayMinutes)];
       if (includeNotes) cells.push('');
       body.append(row(cells, 'report-day-total'));

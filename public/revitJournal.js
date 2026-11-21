@@ -160,10 +160,10 @@ export function analyseJournals(journals, options) {
       const to = block.periods[block.periods.length - 1].end;
       const blockEvents = (eventsByDay.get(day.key) ?? []).filter((event) => event.time >= from && event.time <= to);
       dayEvents.push(...blockEvents);
-      if (activity || blockEvents.length) {
-        block.activity = activity ?? { start: block.start, binMinutes: ACTIVITY_STEP_MINUTES, files: [], bins: [] };
-        block.activity.actions = actionsSummary(blockEvents);
-      }
+      // Every imported block keeps its activity, even with no file named at
+      // all (then the whole block shows as "no file loaded").
+      block.activity = activity ?? emptyActivity(block);
+      block.activity.actions = actionsSummary(blockEvents);
       delete block.periods;
     }
     day.actions = actionsSummary(dayEvents);
@@ -255,6 +255,11 @@ function blockActivity(block, dayMentions) {
     files: [...fileIndex.keys()],
     bins: steps.map((counts) => Array.from({ length: fileIndex.size }, (_, index) => counts.get(index) ?? 0)),
   };
+}
+
+function emptyActivity(block) {
+  const stepCount = (block.end - block.start) / ACTIVITY_STEP_MINUTES;
+  return { start: block.start, binMinutes: ACTIVITY_STEP_MINUTES, files: [], bins: Array.from({ length: stepCount }, () => []) };
 }
 
 export function journalDateRange(journals) {

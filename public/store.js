@@ -54,7 +54,20 @@ export function onSaveStatus(listener) { statusListener = listener; }
 export function onChange(listener) { changeListener = listener; }
 
 function setData(loaded) {
-  data = { labels: loaded.labels ?? {}, days: loaded.days ?? {} };
+  data = { labels: loaded.labels ?? {}, days: loaded.days ?? {}, settings: loaded.settings ?? {} };
+}
+
+// ---------- settings saved with the data ----------
+
+// Whether quarter-hours in Revit with no file loaded (from journal activity)
+// count towards totals. On unless switched off.
+export function countsNoFileTime() {
+  return data.settings?.countNoFileTime !== false;
+}
+
+export function setCountNoFileTime(count) {
+  data.settings = { ...data.settings, countNoFileTime: count };
+  dataChanged();
 }
 
 function dataChanged() {
@@ -137,8 +150,37 @@ export function findEntryAt(key, slot) {
   return getEntries(key).find((entry) => entry.start <= minute && minute < entry.end) ?? null;
 }
 
+// Quarter-hours of a block (minute of day of each) in which Revit had no file
+// loaded: the journal names no file in them. Only for blocks with journal activity.
+export function noFileSlots(entry) {
+  const activity = entry.activity;
+  if (!activity) return [];
+  const step = activity.binMinutes ?? SLOT_MINUTES;
+  const empty = [];
+  for (let slotStart = entry.start; slotStart < entry.end; slotStart += SLOT_MINUTES) {
+    let mentions = 0;
+    for (let minute = slotStart; minute < slotStart + SLOT_MINUTES; minute += step) {
+      const counts = activity.bins[(minute - activity.start) / step];
+      if (counts) mentions += counts.reduce((sum, count) => sum + count, 0);
+    }
+    if (mentions === 0) empty.push(slotStart);
+  }
+  return empty;
+}
+
+export function noFileMinutes(entry) {
+  return noFileSlots(entry).length * SLOT_MINUTES;
+}
+
+// The minutes a block counts for: its length, less any time with no file
+// loaded when that is switched off.
+export function countedMinutes(entry) {
+  const length = entry.end - entry.start;
+  return countsNoFileTime() ? length : length - noFileMinutes(entry);
+}
+
 export function minutesOnDay(key) {
-  return getEntries(key).reduce((sum, entry) => sum + entry.end - entry.start, 0);
+  return getEntries(key).reduce((sum, entry) => sum + countedMinutes(entry), 0);
 }
 
 // Map of label -> minutes across the given days, largest first.
@@ -146,7 +188,7 @@ export function minutesByLabel(keys) {
   const totals = new Map();
   for (const key of keys) {
     for (const entry of getEntries(key)) {
-      totals.set(entry.label, (totals.get(entry.label) ?? 0) + entry.end - entry.start);
+      totals.set(entry.label, (totals.get(entry.label) ?? 0) + countedMinutes(entry));
     }
   }
   return new Map([...totals].sort((a, b) => b[1] - a[1]));
