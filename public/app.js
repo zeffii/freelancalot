@@ -9,6 +9,7 @@ import { renderDayView } from './dayView.js';
 import { renderWeekView, renderMonthView, renderYearView } from './calendarViews.js';
 import { openReportDialog } from './reportDialog.js';
 import { openImportDialog, importFromAddressBar } from './importDialog.js';
+import { openJournalDialog } from './journalDialog.js';
 
 const FULL_DAY_SETTING = 'timesheet.fullDay';
 
@@ -110,6 +111,7 @@ function wireToolbar() {
     render();
   });
 
+  document.getElementById('journalButton').addEventListener('click', openJournalDialog);
   document.getElementById('pdfButton').addEventListener('click', () => openReportDialog(state));
   document.getElementById('exportButton').addEventListener('click', downloadExport);
   document.getElementById('importButton').addEventListener('click', openImportDialog);

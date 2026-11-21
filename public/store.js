@@ -175,6 +175,35 @@ export function assignSlots(key, firstSlot, lastSlot, label) {
   dataChanged();
 }
 
+// Add blocks [{ start, end, note }] with one label to a day, only into empty time
+// (existing blocks are never overwritten). Returns minutes added and skipped.
+export function addBlocks(key, label, blocks) {
+  const slots = getSlots(key);
+  let added = 0;
+  let skipped = 0;
+  for (const block of blocks) {
+    const value = { label, note: (block.note ?? '').trim() };
+    for (let slot = block.start / SLOT_MINUTES; slot < block.end / SLOT_MINUTES; slot++) {
+      if (slots[slot]) {
+        skipped += SLOT_MINUTES;
+      } else {
+        slots[slot] = value;
+        added += SLOT_MINUTES;
+      }
+    }
+  }
+  if (added) {
+    storeSlots(key, slots);
+    markLabelUsed(label);
+    dataChanged();
+  }
+  return { added, skipped };
+}
+
+export function getLabelNames() {
+  return Object.keys(data.labels);
+}
+
 export function setNote(key, slot, note) {
   const slots = getSlots(key);
   const [first, last] = blockRange(slots, slot);

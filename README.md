@@ -26,6 +26,10 @@ Leave the console window open while you use it. Closing it stops the server.
   Ctrl+Enter or clicking away saves.
 - **Week / Month / Year**: overview. Click a day to open it, click a month name in year view to open that month.
 - Every view lists hours per label underneath. Click a label's colour square to change its colour, or its name to rename it (renaming to an existing name merges the two).
+- **Revit journals**: works out when Revit was in use from its journal files and adds
+  that time as blocks under a label (only into empty time). See
+  [docs/revit-journals.md](docs/revit-journals.md) for where the journals are, how long
+  Revit keeps them, how to read them and how the hours are worked out.
 - **Export PDF**: pick a period, the labels to include and whether to include notes, then
   preview the report and save it with "Save as PDF" in the print dialog. Only days with time
   for those labels are listed, with a total per day (when it has several blocks), per label
@@ -55,4 +59,5 @@ which fetches them instead.
 - `public/calendarViews.js`: week, month and year views
 - `public/summary.js`: the hours per label list
 - `public/report.js`, `public/reportDialog.js`: the PDF report and its dialog
+- `public/revitJournal.js`, `public/journalDialog.js`: reading Revit journals and their dialog
 - `public/app.js`: toolbar and switching between views
