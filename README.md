@@ -30,8 +30,11 @@ Leave the console window open while you use it. Closing it stops the server.
   that time as blocks under a label (only into empty time). See
   [docs/revit-journals.md](docs/revit-journals.md) for where the journals are, how long
   Revit keeps them, how to read them and how the hours are worked out.
-- **Export PDF**: pick a period, the labels to include and whether to include notes, then
-  preview the report and save it with "Save as PDF" in the print dialog. Only days with time
+- **Export PDF**: pick a period, the labels to include, which sections (timeline, week
+  summaries, day summaries) and whether to include notes, then preview the report and save
+  it with "Save as PDF" in the print dialog. The timeline is a Gantt chart with a row per
+  day; week and day summaries show the time plus, for blocks from Revit journals, actions,
+  undos, saves, dimensions, deletes and the share of each file worked in. Only days with time
   for those labels are listed, with a total per day (when it has several blocks), per label
   and overall.
 - ← / → step back and forward.
@@ -59,7 +62,7 @@ which fetches them instead.
 - `public/dayView.js`, `public/labelPopover.js`, `public/notePanel.js`: day view, the label box and the note panel
 - `public/calendarViews.js`: week, month and year views
 - `public/summary.js`: the hours per label list
-- `public/report.js`, `public/reportDialog.js`: the PDF report and its dialog
+- `public/report.js`, `public/reportSections.js`, `public/reportDialog.js`: the PDF report, its timeline/week/day sections and its dialog
 - `public/revitJournal.js`, `public/journalDialog.js`: reading Revit journals (folder, files or zip) and their dialog
 - `public/vendor/fflate.js`: zip reading ([fflate](https://github.com/101arrowz/fflate), MIT licence)
 - `public/app.js`: toolbar and switching between views

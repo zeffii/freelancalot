@@ -7,6 +7,7 @@ import {
 import { getLabelColor } from './store.js';
 import { buildReport, labelTotalsInRange } from './report.js';
 
+const SECTIONS_SETTING = 'freelancalot.reportSections';
 const toInputValue = (date) => dateKey(date);
 const fromInputValue = (value) => {
   const [year, month, day] = value.split('-').map(Number);
@@ -69,13 +70,30 @@ export function openReportDialog({ view, date }) {
   notesCheckbox.checked = true;
   notesToggle.append(notesCheckbox, ' Include notes');
 
+  // Rich sections, each optional; the choice is remembered.
+  const savedSections = (() => {
+    try { return { timeline: true, weeks: true, days: true, ...JSON.parse(localStorage.getItem(SECTIONS_SETTING)) }; } catch { return { timeline: true, weeks: true, days: true }; }
+  })();
+  const sectionBoxes = {};
+  const sectionsRow = el('div', 'dialog-row');
+  sectionsRow.append(el('span', 'dialog-label', 'Include'));
+  for (const [name, text] of [['timeline', 'Timeline'], ['weeks', 'Week summaries'], ['days', 'Day summaries']]) {
+    const toggle = el('label', 'toggle');
+    const box = el('input');
+    box.type = 'checkbox';
+    box.checked = savedSections[name];
+    toggle.append(box, ` ${text}`);
+    sectionBoxes[name] = box;
+    sectionsRow.append(toggle);
+  }
+
   const error = el('p', 'dialog-error');
   const createButton = el('button', 'primary', 'Preview PDF');
   const cancelButton = el('button', '', 'Cancel');
   const actions = el('div', 'dialog-actions');
   actions.append(createButton, cancelButton);
 
-  dialog.append(el('h2', '', 'Export PDF'), presets, period, labelHeader, labelList, notesToggle, error, actions);
+  dialog.append(el('h2', '', 'Export PDF'), presets, period, labelHeader, labelList, sectionsRow, notesToggle, error, actions);
   document.body.append(backdrop);
 
   const readPeriod = () => [fromInputValue(fromInput.value), fromInputValue(toInput.value)];
@@ -121,7 +139,9 @@ export function openReportDialog({ view, date }) {
       return;
     }
     close();
-    const report = buildReport({ fromDate, toDate, labels: chosenLabels(), includeNotes: notesCheckbox.checked });
+    const sections = Object.fromEntries(Object.entries(sectionBoxes).map(([name, box]) => [name, box.checked]));
+    localStorage.setItem(SECTIONS_SETTING, JSON.stringify(sections));
+    const report = buildReport({ fromDate, toDate, labels: chosenLabels(), includeNotes: notesCheckbox.checked, sections });
     showPreview(report, `Timesheet ${fromInput.value} to ${toInput.value}`);
   });
 

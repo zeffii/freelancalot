@@ -36,6 +36,15 @@ function groupedBins(activity, rowMinutes) {
   return [...rows].map(([start, counts]) => ({ start, counts }));
 }
 
+// Total count per file (families grouped) over a whole activity: Map(group -> count)
+export function fileCounts(activity) {
+  const totals = new Map();
+  for (const bin of groupedBins(activity)) {
+    for (const [group, count] of bin.counts) totals.set(group, (totals.get(group) ?? 0) + count);
+  }
+  return totals;
+}
+
 // One colour per file (or the families group), the same in every block.
 // Recomputed per drawing from all activity in the timesheet.
 export function fileColors() {

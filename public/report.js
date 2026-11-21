@@ -4,6 +4,7 @@ import { el, labelChip } from './dom.js';
 import { addDays, dateKey, formatTime, formatDuration, formatLongDate } from './dates.js';
 import { getEntries, getLabelColor } from './store.js';
 import { renderNoteText } from './notePanel.js';
+import { chosenDays, buildTimeline, buildWeekSummaries, buildDaySummaries } from './reportSections.js';
 
 // "6h 45m (6.75 h)" — the decimal form is handy for invoicing.
 function formatTotal(minutes) {
@@ -27,7 +28,8 @@ export function labelTotalsInRange(fromDate, toDate) {
   return new Map([...totals].sort((a, b) => b[1] - a[1]));
 }
 
-export function buildReport({ fromDate, toDate, labels, includeNotes }) {
+// sections: { timeline, weeks, days } — which rich sections to include.
+export function buildReport({ fromDate, toDate, labels, includeNotes, sections = {} }) {
   const report = el('article', 'report');
   const totals = labelTotalsInRange(fromDate, toDate);
   const chosen = [...totals.keys()].filter((label) => labels.includes(label));
@@ -41,6 +43,10 @@ export function buildReport({ fromDate, toDate, labels, includeNotes }) {
   }
 
   report.append(buildOverview(chosen, totals, fromDate, toDate));
+  const items = chosenDays(daysInRange(fromDate, toDate), chosen);
+  if (sections.timeline) report.append(buildTimeline(items));
+  if (sections.weeks) report.append(buildWeekSummaries(items));
+  if (sections.days) report.append(buildDaySummaries(items));
   for (const label of chosen) {
     report.append(buildLabelSection(label, totals.get(label), fromDate, toDate, includeNotes));
   }
