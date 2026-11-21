@@ -68,7 +68,7 @@ function render() {
   });
   fullDayToggle.style.visibility = state.view === 'day' || state.view === 'week' ? 'visible' : 'hidden';
 
-  const options = { fullDay: state.fullDay, openDay, openMonth };
+  const options = { fullDay: state.fullDay, openDay, openMonth, rerender: render };
   if (state.view === 'day') renderDayView(viewContainer, state.date, options);
   else if (state.view === 'week') renderWeekView(viewContainer, state.date, options);
   else if (state.view === 'month') renderMonthView(viewContainer, state.date, options);

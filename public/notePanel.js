@@ -1,0 +1,105 @@
+// The panel to the right of the day view: shows and edits the note of the
+// selected block. Notes are plain text; URLs and [text](url) become links.
+import { el, labelChip } from './dom.js';
+import { formatTime, formatDuration } from './dates.js';
+import { getLabelColor, setNote, deleteBlock } from './store.js';
+
+// entry: the selected block, or null. startEditing: open the text box straight away.
+export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel, onDeleted }) {
+  const panel = el('aside', 'note-panel');
+
+  if (!entry) {
+    panel.append(el('p', 'muted', 'Click a block to see or add its note. Drag across empty slots to log time.'));
+    return panel;
+  }
+
+  const header = el('div', 'note-header');
+  const swatch = el('span', 'note-swatch');
+  swatch.style.background = getLabelColor(entry.label);
+  header.append(swatch, labelChip(entry.label));
+  const range = el('div', 'muted note-range', `${formatTime(entry.start)}–${formatTime(entry.end)} · ${formatDuration(entry.end - entry.start)}`);
+
+  const body = el('div', 'note-body');
+  const editButton = el('button', '', 'Edit note');
+  const labelButton = el('button', '', 'Change label');
+  const deleteButton = el('button', '', 'Delete block');
+  const actions = el('div', 'note-actions');
+  actions.append(editButton, labelButton, deleteButton);
+
+  const showNote = () => {
+    body.replaceChildren();
+    editButton.style.display = '';
+    if (entry.note) {
+      const rendered = renderNoteText(entry.note);
+      rendered.title = 'Click to edit';
+      rendered.addEventListener('click', (event) => {
+        if (!event.target.closest('a')) showEditor();
+      });
+      body.append(rendered);
+    } else {
+      editButton.textContent = 'Add note';
+    }
+  };
+
+  const showEditor = () => {
+    body.replaceChildren();
+    editButton.style.display = 'none';
+    const textarea = el('textarea', 'note-input');
+    textarea.value = entry.note ?? '';
+    textarea.placeholder = 'Note for this block. Paste a URL, or write [text](https://…)';
+    body.append(textarea, el('div', 'muted note-hint', 'Ctrl+Enter or click away to save · Esc to cancel'));
+    // The panel may not be on the page yet when this runs, so focus once it is.
+    requestAnimationFrame(() => textarea.focus());
+
+    let cancelled = false;
+    textarea.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) textarea.blur();
+      if (event.key === 'Escape') {
+        cancelled = true;
+        textarea.blur();
+      }
+    });
+    textarea.addEventListener('blur', () => {
+      const changed = textarea.value.trim() !== (entry.note ?? '');
+      if (!cancelled && changed) setNote(key, slot, textarea.value); // redraws the view
+      else showNote();
+    });
+  };
+
+  editButton.addEventListener('click', showEditor);
+  labelButton.addEventListener('click', () => onChangeLabel(entry));
+  deleteButton.addEventListener('click', () => {
+    if (!confirm(`Delete this ${formatDuration(entry.end - entry.start)} block of "${entry.label}"?`)) return;
+    onDeleted();
+    deleteBlock(key, slot);
+  });
+
+  panel.append(header, range, body, actions);
+  if (startEditing) {
+    showEditor();
+  } else {
+    showNote();
+  }
+  return panel;
+}
+
+// Matches [text](http…) or a bare http(s) URL.
+const LINK_PATTERN = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>]+[^\s<>.,;:!?)\]'"])/g;
+
+// Builds the note as DOM nodes (never innerHTML), turning links into <a>.
+export function renderNoteText(text) {
+  const container = el('div', 'note-text');
+  let position = 0;
+  for (const match of text.matchAll(LINK_PATTERN)) {
+    container.append(text.slice(position, match.index));
+    const [, linkText, linkUrl, bareUrl] = match;
+    const link = el('a', '', linkText ?? bareUrl);
+    link.href = linkUrl ?? bareUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    container.append(link);
+    position = match.index + match[0].length;
+  }
+  container.append(text.slice(position));
+  return container;
+}

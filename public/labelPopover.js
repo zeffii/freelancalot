@@ -6,13 +6,14 @@
 import { el, labelChip } from './dom.js';
 import { formatTime, formatDuration } from './dates.js';
 import {
-  SLOT_MINUTES, assignSlots, getSlotLabels, suggestLabels, labelExists, getLabelColor,
+  SLOT_MINUTES, getSlotLabels, suggestLabels, labelExists, getLabelColor,
 } from './store.js';
 
 const MAX_SUGGESTIONS = 8;
 const POPOVER_HEIGHT_ESTIMATE = 330;
 
-export function openLabelPopover({ parent, top, key, firstSlot, lastSlot, onClose }) {
+// onAssign(label) and onClear() do the actual change; the popover only asks.
+export function openLabelPopover({ parent, top, key, firstSlot, lastSlot, onAssign, onClear, onClose }) {
   const popover = el('div', 'label-popover');
   const maxTop = Math.max(0, parent.clientHeight - POPOVER_HEIGHT_ESTIMATE);
   popover.style.top = `${Math.min(top, maxTop)}px`;
@@ -73,7 +74,7 @@ export function openLabelPopover({ parent, top, key, firstSlot, lastSlot, onClos
       return;
     }
     close();
-    assignSlots(key, firstSlot, lastSlot, label);
+    onAssign(label);
   }
 
   function close() {
@@ -110,7 +111,7 @@ export function openLabelPopover({ parent, top, key, firstSlot, lastSlot, onClos
   assignButton.addEventListener('click', () => assign(input.value.trim()));
   clearButton.addEventListener('click', () => {
     close();
-    assignSlots(key, firstSlot, lastSlot, null);
+    onClear();
   });
   cancelButton.addEventListener('click', close);
 

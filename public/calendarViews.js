@@ -43,7 +43,7 @@ export function renderWeekView(container, date, { fullDay, openDay }) {
       block.style.top = `${(start - firstMinute) * pixelsPerMinute}px`;
       block.style.height = `${(end - start) * pixelsPerMinute - 1}px`;
       block.style.background = getLabelColor(entry.label);
-      block.title = entry.label;
+      block.title = entry.note ? `${entry.label}\n${entry.note}` : entry.label;
       if (end - start >= 45) block.append(labelChip(entry.label));
       body.append(block);
     }

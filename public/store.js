@@ -3,9 +3,11 @@
 // Shape of timesheet.json:
 // {
 //   "labels": { "Kelly – Revit families": { "color": "#1D9E75", "lastUsed": 1763700000000 } },
-//   "days":   { "2026-11-21": [ { "start": 540, "end": 690, "label": "Kelly – Revit families" } ] }
+//   "days":   { "2026-11-21": [ { "start": 540, "end": 690, "label": "Kelly – Revit families", "note": "…" } ] }
 // }
 // start/end are minutes from midnight, always on 15-minute boundaries.
+// An entry may also have a "note" (free text, may contain links). Notes belong
+// to one block of time, so blocks with the same label can have different notes.
 
 export const SLOT_MINUTES = 15;
 export const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES;
@@ -104,15 +106,26 @@ export function getLabelColor(name) {
   return data.labels[name]?.color ?? FALLBACK_COLOR;
 }
 
-// One label (or null) per 15-minute slot of the day.
-export function getSlotLabels(key) {
+// One { label, note } (or null) per 15-minute slot of the day.
+function getSlots(key) {
   const slots = new Array(SLOTS_PER_DAY).fill(null);
   for (const entry of getEntries(key)) {
     for (let slot = entry.start / SLOT_MINUTES; slot < entry.end / SLOT_MINUTES; slot++) {
-      slots[slot] = entry.label;
+      slots[slot] = { label: entry.label, note: entry.note ?? '' };
     }
   }
   return slots;
+}
+
+// One label (or null) per 15-minute slot of the day.
+export function getSlotLabels(key) {
+  return getSlots(key).map((slot) => slot?.label ?? null);
+}
+
+// The block (entry) covering a slot, or null.
+export function findEntryAt(key, slot) {
+  const minute = slot * SLOT_MINUTES;
+  return getEntries(key).find((entry) => entry.start <= minute && minute < entry.end) ?? null;
 }
 
 export function minutesOnDay(key) {
@@ -148,16 +161,60 @@ export function labelExists(name) {
 // ---------- changing ----------
 
 // Give slots firstSlot..lastSlot (inclusive) a label, or clear them with label = null.
+// Slots that already had this label keep their note; newly labelled slots take
+// the note of a same-label block they touch, so extending a block keeps its note.
 export function assignSlots(key, firstSlot, lastSlot, label) {
-  const slots = getSlotLabels(key);
-  for (let slot = firstSlot; slot <= lastSlot; slot++) slots[slot] = label;
+  const slots = getSlots(key);
+  const note = label ? noteToInherit(slots, firstSlot, lastSlot, label) : '';
+  for (let slot = firstSlot; slot <= lastSlot; slot++) {
+    if (!label) slots[slot] = null;
+    else if (slots[slot]?.label !== label) slots[slot] = { label, note };
+  }
+  storeSlots(key, slots);
+  if (label) markLabelUsed(label);
+  dataChanged();
+}
 
+export function setNote(key, slot, note) {
+  const slots = getSlots(key);
+  const [first, last] = blockRange(slots, slot);
+  if (first === null) return;
+  for (let s = first; s <= last; s++) slots[s] = { label: slots[s].label, note: note.trim() };
+  storeSlots(key, slots);
+  dataChanged();
+}
+
+export function deleteBlock(key, slot) {
+  const slots = getSlots(key);
+  const [first, last] = blockRange(slots, slot);
+  if (first === null) return;
+  for (let s = first; s <= last; s++) slots[s] = null;
+  storeSlots(key, slots);
+  dataChanged();
+}
+
+function noteToInherit(slots, firstSlot, lastSlot, label) {
+  const candidates = [firstSlot - 1, lastSlot + 1];
+  for (let slot = firstSlot; slot <= lastSlot; slot++) candidates.push(slot);
+  const match = candidates.find((slot) => slots[slot]?.label === label);
+  return match === undefined ? '' : slots[match].note;
+}
+
+// First and last slot of the block (same label and note) around a slot.
+function blockRange(slots, slot) {
+  if (!slots[slot]) return [null, null];
+  const same = (s) => slots[s] && slots[s].label === slots[slot].label && slots[s].note === slots[slot].note;
+  let first = slot;
+  let last = slot;
+  while (first > 0 && same(first - 1)) first--;
+  while (last < slots.length - 1 && same(last + 1)) last++;
+  return [first, last];
+}
+
+function storeSlots(key, slots) {
   const entries = slotsToEntries(slots);
   if (entries.length) data.days[key] = entries;
   else delete data.days[key];
-
-  if (label) markLabelUsed(label);
-  dataChanged();
 }
 
 export function setLabelColor(name, color) {
@@ -179,8 +236,8 @@ export function renameLabel(oldName, newName) {
   delete data.labels[oldName];
 
   for (const key of Object.keys(data.days)) {
-    const slots = getSlotLabels(key).map((label) => (label === oldName ? newName : label));
-    data.days[key] = slotsToEntries(slots); // re-joins blocks that now touch
+    const slots = getSlots(key).map((slot) => (slot?.label === oldName ? { ...slot, label: newName } : slot));
+    storeSlots(key, slots); // re-joins blocks that now touch (if their notes match)
   }
   dataChanged();
 }
@@ -196,15 +253,20 @@ function pickNewLabelColor() {
   return unused ?? LABEL_PALETTE[Object.keys(data.labels).length % LABEL_PALETTE.length];
 }
 
-// Collapse runs of equal slots into { start, end, label } entries.
+// Collapse runs of equal slots (same label and note) into entries.
 function slotsToEntries(slots) {
+  const sameAs = (a, b) => (a === null || b === null ? a === b : a.label === b.label && a.note === b.note);
   const entries = [];
   let runStart = 0;
   while (runStart < slots.length) {
-    const label = slots[runStart];
+    const slot = slots[runStart];
     let runEnd = runStart;
-    while (runEnd < slots.length && slots[runEnd] === label) runEnd++;
-    if (label) entries.push({ start: runStart * SLOT_MINUTES, end: runEnd * SLOT_MINUTES, label });
+    while (runEnd < slots.length && sameAs(slots[runEnd], slot)) runEnd++;
+    if (slot) {
+      const entry = { start: runStart * SLOT_MINUTES, end: runEnd * SLOT_MINUTES, label: slot.label };
+      if (slot.note) entry.note = slot.note;
+      entries.push(entry);
+    }
     runStart = runEnd;
   }
   return entries;

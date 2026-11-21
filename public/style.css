@@ -17,7 +17,7 @@
 }
 
 body { margin: 0; }
-main { max-width: 1100px; margin: 0 auto; padding: 16px 24px 48px; }
+main { max-width: 1400px; margin: 0 auto; padding: 16px 24px 48px; }
 h1 { font-size: 17px; font-weight: 500; margin: 0 8px; min-width: 260px; }
 h2 { font-size: 15px; font-weight: 500; margin: 0 0 8px; }
 .muted { color: var(--text-muted); }
@@ -73,6 +73,36 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
   background: rgba(0, 0, 0, 0.04); z-index: 2;
 }
 .hidden-note { margin: 8px 0 0 52px; }
+
+/* ---------- notes ---------- */
+.day-page { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.time-block.selected { outline: 2px solid var(--text); outline-offset: 1px; z-index: 1; }
+.note-chip { font-style: italic; flex-shrink: 1; min-width: 0; }
+.time-block .label-chip:not(.note-chip) { flex-shrink: 0; }
+.note-panel {
+  position: sticky; top: 64px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px;
+}
+.note-panel > p { margin: 0; }
+.note-header { display: flex; align-items: center; gap: 8px; }
+.note-header .label-chip { border: 1px solid var(--line); }
+.note-swatch { width: 14px; height: 14px; border-radius: 3px; flex: none; }
+.note-range { font-size: 13px; margin: 6px 0 10px; }
+.note-body { margin-bottom: 10px; }
+.note-text {
+  white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; line-height: 1.5;
+  padding: 6px 8px; border-radius: var(--radius); background: var(--surface-muted);
+}
+.note-text a { color: var(--accent); }
+.note-input {
+  width: 100%; min-height: 160px; box-sizing: border-box; resize: vertical;
+  font: inherit; line-height: 1.5; padding: 6px 8px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+}
+.note-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.note-hint { font-size: 12px; margin-top: 4px; }
+.note-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.note-actions button { font-size: 13px; padding: 4px 10px; }
 
 /* ---------- label popover ---------- */
 .label-popover {
