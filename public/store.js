@@ -80,6 +80,12 @@ async function saveNow() {
   }
 }
 
+// Remove all logged time and all labels.
+export function clearAll() {
+  setData({});
+  dataChanged();
+}
+
 // ---------- export and import (a timesheet.json file) ----------
 
 export function exportJson() {

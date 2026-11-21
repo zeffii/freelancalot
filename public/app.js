@@ -3,7 +3,7 @@ import {
   MONTH_NAMES, addDays, addMonths, startOfWeek, today, formatLongDate,
 } from './dates.js';
 import {
-  loadData, onChange, onSaveStatus, getStorageMode, exportJson,
+  loadData, onChange, onSaveStatus, getStorageMode, exportJson, clearAll,
 } from './store.js';
 import { renderDayView } from './dayView.js';
 import { renderWeekView, renderMonthView, renderYearView } from './calendarViews.js';
@@ -127,6 +127,7 @@ function wireToolbar() {
   document.getElementById('pdfButton').addEventListener('click', () => openReportDialog(state));
   document.getElementById('exportButton').addEventListener('click', downloadExport);
   document.getElementById('importButton').addEventListener('click', openImportDialog);
+  document.getElementById('clearButton').addEventListener('click', clearEverything);
 
   document.addEventListener('keydown', (event) => {
     if (event.target.closest('input, textarea') || document.querySelector('.modal-backdrop, .report-preview')) return;
@@ -142,6 +143,15 @@ function downloadExport() {
   link.download = 'timesheet.json';
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+// Asks first, and offers to download a copy (Export JSON) before clearing.
+function clearEverything() {
+  if (!confirm('Delete ALL logged time, notes and labels?\n\nThis cannot be undone.')) return;
+  if (confirm('Download a copy first (Export JSON)?\n\nOK = download a copy, then clear\nCancel = clear without a copy')) {
+    downloadExport();
+  }
+  clearAll();
 }
 
 async function start() {
