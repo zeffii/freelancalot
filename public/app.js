@@ -12,17 +12,21 @@ import { openImportDialog, importFromAddressBar } from './importDialog.js';
 import { openJournalDialog } from './journalDialog.js';
 
 const FULL_DAY_SETTING = 'timesheet.fullDay';
+const SHOW_NOTES_SETTING = 'timesheet.weekShowNotes';
 
 const state = {
   view: 'day',
   date: today(),
   fullDay: localStorage.getItem(FULL_DAY_SETTING) === 'true',
+  showNotes: localStorage.getItem(SHOW_NOTES_SETTING) !== 'false', // on unless switched off
 };
 
 const viewContainer = document.getElementById('view');
 const titleElement = document.getElementById('title');
 const fullDayToggle = document.getElementById('fullDayToggle');
 const fullDayCheckbox = document.getElementById('fullDayCheckbox');
+const showNotesToggle = document.getElementById('showNotesToggle');
+const showNotesCheckbox = document.getElementById('showNotesCheckbox');
 const saveStatus = document.getElementById('saveStatus');
 
 function openDay(date) {
@@ -70,8 +74,9 @@ function render() {
     button.classList.toggle('active', button.dataset.view === state.view);
   });
   fullDayToggle.style.visibility = state.view === 'day' || state.view === 'week' ? 'visible' : 'hidden';
+  showNotesToggle.style.display = state.view === 'week' ? '' : 'none';
 
-  const options = { fullDay: state.fullDay, openDay, openMonth, rerender: render };
+  const options = { fullDay: state.fullDay, showNotes: state.showNotes, openDay, openMonth, rerender: render };
   if (state.view === 'day') renderDayView(viewContainer, state.date, options);
   else if (state.view === 'week') renderWeekView(viewContainer, state.date, options);
   else if (state.view === 'month') renderMonthView(viewContainer, state.date, options);
@@ -101,6 +106,13 @@ function wireToolbar() {
   document.getElementById('nextButton').addEventListener('click', () => step(1));
   document.getElementById('todayButton').addEventListener('click', () => {
     state.date = today();
+    render();
+  });
+
+  showNotesCheckbox.checked = state.showNotes;
+  showNotesCheckbox.addEventListener('change', () => {
+    state.showNotes = showNotesCheckbox.checked;
+    localStorage.setItem(SHOW_NOTES_SETTING, String(state.showNotes));
     render();
   });
 

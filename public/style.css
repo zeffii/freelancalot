@@ -18,7 +18,7 @@
 
 body { margin: 0; }
 main { max-width: 1400px; margin: 0 auto; padding: 16px 24px 48px; }
-h1 { font-size: 17px; font-weight: 500; margin: 0 8px; min-width: 260px; }
+h1 { font-size: 16px; font-weight: 500; margin: 0 4px; white-space: nowrap; }
 h2 { font-size: 15px; font-weight: 500; margin: 0 0 8px; }
 .muted { color: var(--text-muted); }
 
@@ -34,12 +34,14 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 /* ---------- toolbar ---------- */
 .toolbar {
   position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 24px; background: var(--surface); border-bottom: 1px solid var(--line);
 }
 .button-group { display: flex; gap: 4px; }
 .toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.save-status { margin-left: auto; color: var(--text-muted); font-size: 13px; }
+.toolbar button { padding: 4px 10px; }
+.toggle { white-space: nowrap; }
+.save-status { margin-left: auto; white-space: nowrap; color: var(--text-muted); font-size: 13px; }
 .save-status.error { color: var(--danger); }
 
 /* ---------- labels: always black text on a white chip ---------- */
@@ -167,13 +169,25 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 .swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
 
 /* ---------- week view ---------- */
-.week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.week-grid { display: grid; grid-template-columns: 40px repeat(7, minmax(0, 1fr)); gap: 6px; }
+.week-gutter-times { position: relative; }
+.week-gutter .week-header::after { content: '\00a0'; }
+.week-gutter .gutter-time { right: 2px; }
 .week-day { cursor: pointer; }
 .week-header { display: flex; justify-content: space-between; font-size: 13px; padding: 0 2px 4px; }
 .week-header.is-today { font-weight: 600; }
 .week-body { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .week-day:hover .week-body { border-color: var(--line-strong); }
-.week-block { position: absolute; left: 2px; right: 2px; border-radius: 3px; padding: 2px; box-sizing: border-box; overflow: hidden; }
+.week-block {
+  position: absolute; left: 2px; right: 2px; border-radius: 3px; padding: 2px; box-sizing: border-box; overflow: hidden;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+}
+.week-block .label-chip { flex: none; }
+.week-note {
+  flex: 0 1 auto; min-height: 0; overflow: hidden; align-self: stretch;
+  background: #fff; color: #000; font-size: 11px; line-height: 13px; padding: 1px 4px;
+  border-radius: 3px; white-space: pre-wrap; overflow-wrap: anywhere;
+}
 .week-block .label-chip { font-size: 11px; line-height: 15px; }
 
 /* ---------- month view ---------- */

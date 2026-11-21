@@ -2,22 +2,30 @@
 import { el, labelChip, noteMarker } from './dom.js';
 import {
   MONTH_NAMES, WEEKDAY_NAMES, dateKey, addDays, startOfWeek, daysInMonth, weekdayIndex,
-  isSameDay, today, formatHoursShort,
+  isSameDay, today, formatHoursShort, formatTime,
 } from './dates.js';
 import { SLOT_MINUTES, getEntries, getLabelColor, minutesOnDay, minutesByLabel } from './store.js';
 import { renderSummary } from './summary.js';
 
 // ---------- week ----------
 
-const WEEK_ROW_HEIGHT = 10; // pixels per 15-minute slot
+const WEEK_ROW_HEIGHT = 13;     // pixels per 15-minute slot (same as the day view)
+const TIME_TICK_HOURS = 2;      // a time label every 2nd hour on the left
 
-export function renderWeekView(container, date, { fullDay, openDay }) {
+// Notes as plain text for the small week blocks: [text](url) shows as text.
+const plainNote = (note) => note.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+export function renderWeekView(container, date, { fullDay, showNotes, openDay }) {
   const firstMinute = fullDay ? 0 : 7 * 60;
   const endMinute = fullDay ? 24 * 60 : 23 * 60;
   const pixelsPerMinute = WEEK_ROW_HEIGHT / SLOT_MINUTES;
+  const bodyHeight = `${(endMinute - firstMinute) * pixelsPerMinute}px`;
   const days = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(date), i));
 
   const week = el('div', 'week-grid');
+  week.append(timeGutter(firstMinute, endMinute, pixelsPerMinute, bodyHeight));
+  const notesToCheck = [];
+
   for (const day of days) {
     const key = dateKey(day);
     const column = el('div', 'week-day');
@@ -29,7 +37,7 @@ export function renderWeekView(container, date, { fullDay, openDay }) {
     header.append(el('span', 'muted', total ? formatHoursShort(total) : ''));
 
     const body = el('div', 'week-body');
-    body.style.height = `${(endMinute - firstMinute) * pixelsPerMinute}px`;
+    body.style.height = bodyHeight;
     for (let hour = firstMinute / 60; hour < endMinute / 60; hour++) {
       const line = el('div', 'slot-line hour');
       line.style.top = `${(hour * 60 - firstMinute) * pixelsPerMinute}px`;
@@ -44,8 +52,16 @@ export function renderWeekView(container, date, { fullDay, openDay }) {
       block.style.height = `${(end - start) * pixelsPerMinute - 1}px`;
       block.style.background = getLabelColor(entry.label);
       block.title = entry.note ? `${entry.label}\n${entry.note}` : entry.label;
-      if (end - start >= 45) block.append(labelChip(entry.label));
-      if (entry.note) block.append(noteMarker());
+      if (end - start >= 30) block.append(labelChip(entry.label));
+      if (entry.note) {
+        const marker = noteMarker();
+        block.append(marker);
+        if (showNotes) {
+          const noteText = el('div', 'week-note', plainNote(entry.note));
+          block.append(noteText);
+          notesToCheck.push({ noteText, marker });
+        }
+      }
       body.append(block);
     }
 
@@ -54,7 +70,31 @@ export function renderWeekView(container, date, { fullDay, openDay }) {
   }
 
   container.append(week);
+
+  // Now that the blocks have their size: a note that fits is shown and the
+  // bubble hidden; a note that doesn't fit is hidden and the bubble stays.
+  for (const { noteText, marker } of notesToCheck) {
+    const fits = noteText.clientHeight >= 12 && noteText.scrollHeight <= noteText.clientHeight + 1;
+    if (fits) marker.remove();
+    else noteText.remove();
+  }
+
   container.append(renderSummary(days.map(dateKey), 'Hours this week'));
+}
+
+function timeGutter(firstMinute, endMinute, pixelsPerMinute, bodyHeight) {
+  const gutter = el('div', 'week-gutter');
+  gutter.append(el('div', 'week-header'));
+  const times = el('div', 'week-gutter-times');
+  times.style.height = bodyHeight;
+  for (let hour = Math.ceil(firstMinute / 60); hour * 60 <= endMinute; hour++) {
+    if (hour % TIME_TICK_HOURS !== 0) continue;
+    const tick = el('div', 'gutter-time', formatTime(hour * 60));
+    tick.style.top = `${(hour * 60 - firstMinute) * pixelsPerMinute}px`;
+    times.append(tick);
+  }
+  gutter.append(times);
+  return gutter;
 }
 
 // ---------- month ----------
