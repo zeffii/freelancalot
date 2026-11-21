@@ -183,7 +183,7 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, color
       block.append(noteMarker());
       block.title = entry.note;
     }
-    if (colors && entry.activity) {
+    if (colors && entry.activity?.files?.length) {
       const blockTopMinute = start * SLOT_MINUTES;
       block.append(activityStrip(entry.activity, {
         visibleStart: start * SLOT_MINUTES,

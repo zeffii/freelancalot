@@ -27,6 +27,9 @@ const dateFromKey = (key) => {
   return new Date(year, month - 1, day);
 };
 
+// "9 (0.9%)": undos and their share of the actions.
+const undoText = (undos, actions) => (actions ? `${undos} (${((undos / actions) * 100).toFixed(1)}%)` : String(undos));
+
 function loadSettings() {
   try {
     return { breakMinutes: 15, minimumMinutes: 5, ignore: '', includeFiles: true, label: '', ...JSON.parse(localStorage.getItem(SETTINGS_KEY)) };
@@ -154,20 +157,26 @@ export function openJournalDialog() {
     }
     const table = el('table', 'journal-table');
     const head = el('tr');
-    for (const heading of ['Day', 'Active in Revit', 'Blocks (to the nearest ¼ h)', 'Blocks total']) head.append(el('th', '', heading));
+    for (const heading of ['Day', 'Active in Revit', 'Blocks (to the nearest ¼ h)', 'Blocks total', 'Actions', 'Undos']) head.append(el('th', '', heading));
     table.append(head);
     let activeTotal = 0;
     let blockTotal = 0;
+    let actionTotal = 0;
+    let undoTotal = 0;
     for (const day of analysed) {
       const blockMinutes = day.blocks.reduce((sum, block) => sum + block.end - block.start, 0);
       activeTotal += day.activeMinutes;
       blockTotal += blockMinutes;
+      actionTotal += day.actions.actions;
+      undoTotal += day.actions.undos;
       const row = el('tr');
       row.append(
         el('td', '', formatLongDate(dateFromKey(day.key))),
         el('td', '', formatDuration(Math.round(day.activeMinutes))),
         el('td', '', day.blocks.map((block) => `${formatTime(block.start)}–${formatTime(block.end)}`).join(', ')),
         el('td', '', formatDuration(blockMinutes)),
+        el('td', '', day.actions.actions.toLocaleString()),
+        el('td', '', undoText(day.actions.undos, day.actions.actions)),
       );
       row.title = day.blocks.map((block) => `${formatTime(block.start)}–${formatTime(block.end)}\n${block.note}`).join('\n\n');
       table.append(row);
@@ -178,6 +187,8 @@ export function openJournalDialog() {
       el('td', '', `${formatDuration(Math.round(activeTotal))} (${(activeTotal / 60).toFixed(2)} h)`),
       el('td', '', ''),
       el('td', '', `${formatDuration(blockTotal)} (${(blockTotal / 60).toFixed(2)} h)`),
+      el('td', '', actionTotal.toLocaleString()),
+      el('td', '', undoText(undoTotal, actionTotal)),
     );
     table.append(total);
     preview.append(table, el('p', 'muted dialog-note', 'Hover a row to see the notes its blocks will get.'));

@@ -101,6 +101,19 @@ Saves show up as `ID_REVIT_FILE_SAVE`.
    **File activity** section expands to the 5-minute detail with each file's
    share of the block. A file keeps the same colour everywhere.
 
+8. **Actions.** Revit logs every completed operation as `"Transaction Successful"`
+   with its name ("Place Dimensions", "Move", "Delete Selection", …), every undo
+   (`ID_EDIT_UNDO`) and, before a delete, what was selected
+   (`SEL RESULT: Walls : Basic Wall : 100mm Blockwork Wall`). Per block this gives:
+   actions done, undos and the undo rate, saves, dimensions placed, deletes by
+   category, and the most frequent actions. The note panel's **Actions** section
+   shows them; the import preview shows actions and undos per day.
+
+   Arrow-key nudges and small drags are counted separately (each key press is one
+   "action"). A dimension string counts once however many segments it has. A
+   multi-undo undoes several steps but the journal doesn't say how many. Deleting
+   several elements at once only says "N items", so those show as *Several elements*.
+
 ### Choosing the break threshold
 
 The break threshold is the one judgement call. Trying a few values shows how

@@ -80,7 +80,7 @@ export function renderWeekView(container, date, { fullDay, showNotes, showActivi
       block.title = entry.note ? `${entry.label}\n${entry.note}` : entry.label;
       if (end - start >= 30) block.append(labelChip(entry.label));
       // File activity, when shown, takes the place of the note text (the bubble stays).
-      const withActivity = Boolean(colors && entry.activity);
+      const withActivity = Boolean(colors && entry.activity?.files?.length);
       if (withActivity) {
         block.append(activityStrip(entry.activity, {
           visibleStart: start,

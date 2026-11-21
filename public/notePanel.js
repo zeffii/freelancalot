@@ -6,6 +6,7 @@ import { getLabelColor, setNote, deleteBlock } from './store.js';
 import { activityStrip, activityLegend, fileColors } from './activity.js';
 
 const ACTIVITY_OPEN_SETTING = 'timesheet.activityOpen';
+const ACTIONS_OPEN_SETTING = 'timesheet.actionsOpen';
 const FINE_ROW_HEIGHT = 6;   // pixels per 5-minute step in the expanded histogram
 
 // entry: the selected block, or null. startEditing: open the text box straight away.
@@ -80,7 +81,8 @@ export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel,
   });
 
   panel.append(header, range, body);
-  if (entry.activity) panel.append(activitySection(entry));
+  if (entry.activity?.files?.length) panel.append(activitySection(entry));
+  if (entry.activity?.actions) panel.append(actionsSection(entry.activity.actions));
   panel.append(actions);
   if (startEditing) {
     showEditor();
@@ -121,6 +123,45 @@ function activitySection(entry) {
   strip.style.height = `${height}px`;
   chart.append(times, strip);
   details.append(chart, activityLegend(entry.activity, entry.start, entry.end, colors));
+  return details;
+}
+
+// Expandable "Actions": what Revit logged as done in this block (from the
+// journals): completed actions, undos, saves, dimensions, deletes by category.
+function actionsSection(actions) {
+  const details = el('details', 'activity-details');
+  details.open = localStorage.getItem(ACTIONS_OPEN_SETTING) === 'true';
+  const undoRate = actions.actions ? `${((actions.undos / actions.actions) * 100).toFixed(1)}%` : '–';
+  details.append(el('summary', '', `Actions · ${actions.actions.toLocaleString()} done, ${actions.undos} undone (${undoRate})`));
+  details.addEventListener('toggle', () => localStorage.setItem(ACTIONS_OPEN_SETTING, String(details.open)));
+
+  const table = el('table', 'actions-table');
+  const row = (name, value, hint = '') => {
+    const tr = el('tr');
+    tr.append(el('td', '', name), el('td', 'actions-number', value), el('td', 'muted', hint));
+    table.append(tr);
+  };
+  row('Actions', actions.actions.toLocaleString(), `plus ${actions.smallActions.toLocaleString()} nudges and drags`);
+  row('Undos', String(actions.undos), actions.multiUndos ? `plus ${actions.multiUndos} multi-undo (several steps each)` : '');
+  if (actions.redos) row('Redos', String(actions.redos));
+  row('Undo rate', undoRate, 'undos per action');
+  row('Saves', String(actions.saves));
+  row('Dimensions placed', String(actions.dimensions), 'each dimension string counts once');
+  details.append(table);
+
+  const list = (title, items) => {
+    if (!items.length) return;
+    details.append(el('div', 'actions-heading', title));
+    const listTable = el('table', 'actions-table');
+    for (const [name, count] of items) {
+      const tr = el('tr');
+      tr.append(el('td', '', name), el('td', 'actions-number', String(count)), el('td'));
+      listTable.append(tr);
+    }
+    details.append(listTable);
+  };
+  list('Deleted', actions.deletes);
+  list('Most frequent actions', actions.topActions);
   return details;
 }
 
