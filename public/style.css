@@ -190,6 +190,7 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 }
 .week-note > div { min-height: 13px; }
 .week-note-heading { font-weight: 500; }
+.week-note-more { color: #555; font-style: italic; }
 .week-note-file { padding-left: 6px; text-indent: -6px; overflow-wrap: normal; }
 .week-block .label-chip { font-size: 11px; line-height: 15px; }
 

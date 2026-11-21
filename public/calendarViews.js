@@ -12,6 +12,7 @@ import { expandFileLists } from './notePanel.js';
 
 const WEEK_ROW_HEIGHT = 13;     // pixels per 15-minute slot (same as the day view)
 const TIME_TICK_HOURS = 2;      // a time label every 2nd hour on the left
+const PARTIAL_NOTE_MINUTES = 60; // blocks this long show as much of a long note as fits
 
 // Notes as plain text for the small week blocks: [text](url) shows as text.
 const plainNote = (note) => note.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
@@ -82,7 +83,8 @@ export function renderWeekView(container, date, { fullDay, showNotes, openDay })
         if (showNotes) {
           const noteText = weekNote(entry.note);
           block.append(noteText);
-          notesToCheck.push({ noteText, marker });
+          const allowPartial = entry.end - entry.start >= PARTIAL_NOTE_MINUTES;
+          notesToCheck.push({ noteText, marker, lines: [...noteText.children], allowPartial });
         }
       }
       body.append(block);
@@ -96,15 +98,34 @@ export function renderWeekView(container, date, { fullDay, showNotes, openDay })
 
   container.append(renderSummary(days.map(dateKey), 'Hours this week'));
 
-  // A note that fits its block is shown and the bubble hidden; one that doesn't
-  // fit is hidden and the bubble stays. Checked again whenever the columns change
-  // width (window resized, scrollbar appearing), as names then wrap differently.
+  // A note that fits its block is shown and the bubble hidden. A note that
+  // doesn't fit is hidden and the bubble stays, except in blocks of an hour or
+  // more: those show as many whole lines as fit, then "… N more lines", and keep
+  // the bubble (hover shows everything). Checked again whenever the columns
+  // change width (window resized, scrollbar appearing), as names then wrap differently.
+  const overflows = (noteText) => noteText.scrollHeight > noteText.clientHeight + 1;
   const fitNotes = () => {
-    for (const { noteText, marker } of notesToCheck) {
+    for (const { noteText, marker, lines, allowPartial } of notesToCheck) {
+      noteText.replaceChildren(...lines);
       noteText.style.display = '';
-      const fits = noteText.clientHeight >= 12 && noteText.scrollHeight <= noteText.clientHeight + 1;
-      noteText.style.display = fits ? '' : 'none';
-      marker.style.display = fits ? 'none' : '';
+      const roomy = noteText.clientHeight >= 12;
+      if (roomy && !overflows(noteText)) {
+        marker.style.display = 'none';
+        continue;
+      }
+      marker.style.display = '';
+      if (!roomy || !allowPartial) {
+        noteText.style.display = 'none';
+        continue;
+      }
+      const more = el('div', 'week-note-more');
+      let shown = lines.length;
+      do {
+        shown--;
+        more.textContent = `… ${lines.length - shown} more line${lines.length - shown === 1 ? '' : 's'}`;
+        noteText.replaceChildren(...lines.slice(0, shown), more);
+      } while (shown > 0 && overflows(noteText));
+      if (shown === 0) noteText.style.display = 'none';
     }
   };
   fitNotes();
