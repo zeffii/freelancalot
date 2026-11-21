@@ -41,7 +41,8 @@ wipe the first week. (Autodesk's documentation lists these as the
 
 What to do:
 
-- **Copy the Journals folder somewhere safe as soon as a job ends** (or zip it).
+- **Copy the Journals folder somewhere safe as soon as a job ends**, or zip it —
+  Freelancalot can read the zip directly.
 - If you want to keep a longer history, raise both numbers in the Options dialog,
   for example to 200 journals and 365 days. Journals are plain text; a heavy day
   is around 5–10 MB.
@@ -121,8 +122,10 @@ pauses as work. 15 minutes is a fair middle and the default.
 ## 6. Using it in Freelancalot
 
 1. Click **Revit journals**.
-2. **Choose Journals folder…** (or pick individual `journal.NNNN.txt` files — for
-   example from a copy you saved).
+2. **Choose Journals folder…**, **Choose zip…** (a zip of the Journals folder, as
+   you'd save it after a job), or **Choose journal files…** to pick individual
+   `journal.NNNN.txt` files. Only the `journal.NNNN.txt` files are read; the
+   `.log` and `.dmp` files in the folder or zip are skipped.
 3. Enter the **label** for the job, check the days, rules and ignored files.
 4. Check the preview: per day, the active time, the blocks and their total.
    Hover over a day to see the notes its blocks will get.

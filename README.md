@@ -59,5 +59,6 @@ which fetches them instead.
 - `public/calendarViews.js`: week, month and year views
 - `public/summary.js`: the hours per label list
 - `public/report.js`, `public/reportDialog.js`: the PDF report and its dialog
-- `public/revitJournal.js`, `public/journalDialog.js`: reading Revit journals and their dialog
+- `public/revitJournal.js`, `public/journalDialog.js`: reading Revit journals (folder, files or zip) and their dialog
+- `public/vendor/fflate.js`: zip reading ([fflate](https://github.com/101arrowz/fflate), MIT licence)
 - `public/app.js`: toolbar and switching between views

@@ -5,11 +5,23 @@ import { el } from './dom.js';
 import { formatDuration, formatTime, formatLongDate } from './dates.js';
 import { addBlocks, getLabelNames } from './store.js';
 import { parseJournal, analyseJournals, journalDateRange } from './revitJournal.js';
+import { unzipSync } from './vendor/fflate.js';
 
 const GUIDE_URL = 'https://github.com/zeffii/freelancalot/blob/master/docs/revit-journals.md';
 const SETTINGS_KEY = 'freelancalot.journalImport';
 
-const isJournalFile = (file) => /^journal\.\d+\.txt$/i.test(file.name);
+const JOURNAL_NAME = /^journal\.\d+\.txt$/i;
+const baseName = (path) => path.split(/[\\/]/).pop();
+const isJournalFile = (file) => JOURNAL_NAME.test(file.name);
+const isZipFile = (file) => /\.zip$/i.test(file.name);
+
+// The journal texts inside a zip (in any folder of it), without unpacking the rest.
+async function journalTextsFromZip(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const entries = unzipSync(bytes, { filter: (entry) => JOURNAL_NAME.test(baseName(entry.name)) });
+  const decoder = new TextDecoder();
+  return Object.values(entries).map((content) => decoder.decode(content));
+}
 const dateFromKey = (key) => {
   const [year, month, day] = key.split('-').map(Number);
   return new Date(year, month - 1, day);
@@ -48,13 +60,18 @@ export function openJournalDialog() {
   const filesInput = el('input');
   filesInput.type = 'file';
   filesInput.multiple = true;
-  filesInput.accept = '.txt';
+  filesInput.accept = '.txt,.zip';
   filesInput.hidden = true;
+  const zipInput = el('input');
+  zipInput.type = 'file';
+  zipInput.accept = '.zip';
+  zipInput.hidden = true;
   const folderButton = el('button', '', 'Choose Journals folder…');
+  const zipButton = el('button', '', 'Choose zip…');
   const filesButton = el('button', '', 'Choose journal files…');
   const sourceStatus = el('span', 'muted', 'No journals chosen yet.');
   const sourceRow = el('div', 'dialog-row');
-  sourceRow.append(el('span', 'dialog-label', 'Journals'), folderButton, filesButton, folderInput, filesInput);
+  sourceRow.append(el('span', 'dialog-label', 'Journals'), folderButton, zipButton, filesButton, folderInput, zipInput, filesInput);
 
   // ---- options ----
   const labelInput = el('input', 'dialog-text');
@@ -161,28 +178,44 @@ export function openJournalDialog() {
     preview.append(table, el('p', 'muted dialog-note', 'Hover a row to see the notes its blocks will get.'));
   }
 
+  // Journal files, zips of them (e.g. the zipped Journals folder), or both.
   async function readJournals(fileList) {
-    const files = [...fileList].filter(isJournalFile);
-    if (files.length === 0) {
-      sourceStatus.textContent = 'No journal files (journal.0001.txt …) found there.';
+    const chosen = [...fileList];
+    const zips = chosen.filter(isZipFile);
+    const files = chosen.filter(isJournalFile);
+    if (zips.length === 0 && files.length === 0) {
+      sourceStatus.textContent = 'No journal files (journal.0001.txt …) or zips found there.';
       return;
     }
-    sourceStatus.textContent = `Reading ${files.length} journals…`;
-    journals = [];
-    for (const file of files) journals.push(parseJournal(await file.text()));
+    sourceStatus.textContent = 'Reading journals…';
+    const texts = [];
+    try {
+      for (const zip of zips) texts.push(...await journalTextsFromZip(zip));
+    } catch (error) {
+      sourceStatus.textContent = `Couldn't open the zip: ${error.message}`;
+      return;
+    }
+    for (const file of files) texts.push(await file.text());
+    if (texts.length === 0) {
+      sourceStatus.textContent = 'No journal files (journal.0001.txt …) inside the zip.';
+      return;
+    }
+    journals = texts.map(parseJournal);
     const range = journalDateRange(journals);
     const saves = journals.reduce((sum, journal) => sum + journal.saves, 0);
     if (range) {
       fromInput.value = range.fromKey;
       toInput.value = range.toKey;
-      sourceStatus.textContent = `${files.length} journals, ${formatLongDate(dateFromKey(range.fromKey))} – ${formatLongDate(dateFromKey(range.toKey))}, ${saves} saves.`;
+      sourceStatus.textContent = `${journals.length} journals, ${formatLongDate(dateFromKey(range.fromKey))} – ${formatLongDate(dateFromKey(range.toKey))}, ${saves} saves.`;
     } else {
-      sourceStatus.textContent = `${files.length} journals, but no user activity in them.`;
+      sourceStatus.textContent = `${journals.length} journals, but no user activity in them.`;
     }
     refreshPreview();
   }
 
   folderButton.addEventListener('click', () => folderInput.click());
+  zipButton.addEventListener('click', () => zipInput.click());
+  zipInput.addEventListener('change', () => readJournals(zipInput.files));
   filesButton.addEventListener('click', () => filesInput.click());
   folderInput.addEventListener('change', () => readJournals(folderInput.files));
   filesInput.addEventListener('change', () => readJournals(filesInput.files));

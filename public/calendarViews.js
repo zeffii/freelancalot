@@ -101,15 +101,34 @@ export function renderWeekView(container, date, { fullDay, showNotes, openDay })
 
   container.append(week);
 
-  // Now that the blocks have their size: a note that fits is shown and the
-  // bubble hidden; a note that doesn't fit is hidden and the bubble stays.
-  for (const { noteText, marker } of notesToCheck) {
-    const fits = noteText.clientHeight >= 12 && noteText.scrollHeight <= noteText.clientHeight + 1;
-    if (fits) marker.remove();
-    else noteText.remove();
-  }
-
   container.append(renderSummary(days.map(dateKey), 'Hours this week'));
+
+  // A note that fits its block is shown and the bubble hidden; one that doesn't
+  // fit is hidden and the bubble stays. Checked again whenever the columns change
+  // width (window resized, scrollbar appearing), as names then wrap differently.
+  const fitNotes = () => {
+    for (const { noteText, marker } of notesToCheck) {
+      noteText.style.display = '';
+      const fits = noteText.clientHeight >= 12 && noteText.scrollHeight <= noteText.clientHeight + 1;
+      noteText.style.display = fits ? '' : 'none';
+      marker.style.display = fits ? 'none' : '';
+    }
+  };
+  fitNotes();
+  if (notesToCheck.length) {
+    let lastWidth = week.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (!week.isConnected) {
+        observer.disconnect();
+        return;
+      }
+      if (week.clientWidth !== lastWidth) {
+        lastWidth = week.clientWidth;
+        fitNotes();
+      }
+    });
+    observer.observe(week);
+  }
 }
 
 function timeGutter(firstMinute, endMinute, pixelsPerMinute, bodyHeight) {
