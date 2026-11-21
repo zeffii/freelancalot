@@ -89,7 +89,7 @@ Saves show up as `ID_REVIT_FILE_SAVE`.
    15-minute slots. Periods that touch after rounding are joined. Rounding to the
    nearest (not outward) keeps the blocks total close to the active total.
 6. **Files per block.** Each block's note lists the models (`.rvt`) and families
-   (`.rfa`) named in the journal during that block, most used first. Revit's
+   (`.rfa`) named in the journal during that block, one per line, most used first. Revit's
    backup copies (`name.0001.rvt`) and temporary families (long hex names) are
    left out, and you can ignore any file by part of its name.
 

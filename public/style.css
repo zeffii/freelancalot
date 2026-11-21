@@ -186,8 +186,11 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 .week-note {
   flex: 0 1 auto; min-height: 0; overflow: hidden; align-self: stretch;
   background: #fff; color: #000; font-size: 11px; line-height: 13px; padding: 1px 4px;
-  border-radius: 3px; white-space: pre-wrap; overflow-wrap: anywhere;
+  border-radius: 3px; overflow-wrap: anywhere;
 }
+.week-note > div { min-height: 13px; }
+.week-note-heading { font-weight: 500; }
+.week-note-file { padding-left: 6px; text-indent: -6px; overflow-wrap: normal; }
 .week-block .label-chip { font-size: 11px; line-height: 15px; }
 
 /* ---------- month view ---------- */

@@ -114,7 +114,8 @@ export function analyseJournals(journals, options) {
   return [...days.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
 
-// "Revit (from journals)" plus the models and families worked in, most used first.
+// "Revit (from journals)" plus the models and families worked in, most used
+// first, one file name per line.
 function blockNote(periods, mentions, includeFiles) {
   let note = 'Revit (from journals)';
   if (!includeFiles) return note;
@@ -127,8 +128,8 @@ function blockNote(periods, mentions, includeFiles) {
   const names = [...counts].sort((a, b) => b[1] - a[1]).map(([name]) => name);
   const models = names.filter((name) => /\.rvt$/i.test(name));
   const families = names.filter((name) => /\.rfa$/i.test(name));
-  if (models.length) note += `\nModels: ${models.join(', ')}`;
-  if (families.length) note += `\nFamilies: ${families.join(', ')}`;
+  if (models.length) note += `\nModels:\n${models.join('\n')}`;
+  if (families.length) note += `\nFamilies:\n${families.join('\n')}`;
   return note;
 }
 

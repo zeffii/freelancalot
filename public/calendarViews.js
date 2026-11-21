@@ -15,6 +15,36 @@ const TIME_TICK_HOURS = 2;      // a time label every 2nd hour on the left
 // Notes as plain text for the small week blocks: [text](url) shows as text.
 const plainNote = (note) => note.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 
+// A file list line ("Models: a.rvt, b.rvt") becomes a heading plus one file per line.
+const FILE_LIST_LINE = /^(Models|Families):\s*(.*)$/;
+const looksLikeFileName = (text) => /\.(rvt|rfa|rte|rft|dwg|ifc|pdf)$/i.test(text.trim());
+
+// Builds a week block's note: one file name per line, and long names may wrap
+// only after a delimiter (- _ . space), so they continue on the next row.
+function weekNote(note) {
+  const container = el('div', 'week-note');
+  for (const line of plainNote(note).split('\n')) {
+    const list = FILE_LIST_LINE.exec(line);
+    if (list) {
+      container.append(el('div', 'week-note-heading', `${list[1]}:`));
+      for (const name of list[2].split(/,\s*(?=\S)/).filter(Boolean)) container.append(fileNameLine(name));
+    } else if (looksLikeFileName(line)) {
+      container.append(fileNameLine(line.trim()));
+    } else {
+      container.append(el('div', /:$/.test(line.trim()) ? 'week-note-heading' : '', line));
+    }
+  }
+  return container;
+}
+
+function fileNameLine(name) {
+  const line = el('div', 'week-note-file');
+  for (const part of name.split(/(?<=[-_. ])/)) {
+    line.append(part, document.createElement('wbr'));
+  }
+  return line;
+}
+
 export function renderWeekView(container, date, { fullDay, showNotes, openDay }) {
   const firstMinute = fullDay ? 0 : 7 * 60;
   const endMinute = fullDay ? 24 * 60 : 23 * 60;
@@ -57,7 +87,7 @@ export function renderWeekView(container, date, { fullDay, showNotes, openDay })
         const marker = noteMarker();
         block.append(marker);
         if (showNotes) {
-          const noteText = el('div', 'week-note', plainNote(entry.note));
+          const noteText = weekNote(entry.note);
           block.append(noteText);
           notesToCheck.push({ noteText, marker });
         }
