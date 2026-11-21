@@ -75,10 +75,17 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 .hidden-note { margin: 8px 0 0 52px; }
 
 /* ---------- notes ---------- */
-.day-page { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.day-page {
+  display: grid; gap: 16px; align-items: start; justify-content: start;
+  grid-template-columns: calc(52px + 50ch) 80ch; /* day: ~50 characters, notes: ~80 */
+}
 .time-block.selected { outline: 2px solid var(--text); outline-offset: 1px; z-index: 1; }
-.note-chip { font-style: italic; flex-shrink: 1; min-width: 0; }
-.time-block .label-chip:not(.note-chip) { flex-shrink: 0; }
+.time-block .label-chip { flex-shrink: 1; min-width: 0; }
+.note-marker {
+  margin-left: auto; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  background: #fff; border-radius: 3px; width: 16px; height: 12px;
+}
+.week-block .note-marker { position: absolute; right: 2px; top: 2px; height: 13px; }
 .note-panel {
   position: sticky; top: 64px; background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 12px 14px;

@@ -1,6 +1,6 @@
 // Day view: 15-minute rows you drag across to select, then label.
 // Clicking a block selects it and shows its note in the panel on the right.
-import { el, labelChip } from './dom.js';
+import { el, labelChip, noteMarker } from './dom.js';
 import { dateKey, formatTime, formatDuration, formatLongDate } from './dates.js';
 import {
   SLOT_MINUTES, SLOTS_PER_DAY, getEntries, getLabelColor, findEntryAt, assignSlots,
@@ -145,10 +145,8 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry) {
     timeChip.classList.add('time-chip');
     block.append(labelChip(entry.label), timeChip);
     if (entry.note) {
-      const firstLine = entry.note.split('\n')[0].replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-      const noteChip = labelChip(firstLine);
-      noteChip.classList.add('note-chip');
-      block.append(noteChip);
+      block.append(noteMarker());
+      block.title = entry.note;
     }
     grid.append(block);
   }

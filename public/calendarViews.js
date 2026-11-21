@@ -1,5 +1,5 @@
 // Week, month and year views. Clicking a day opens it in day view.
-import { el, labelChip } from './dom.js';
+import { el, labelChip, noteMarker } from './dom.js';
 import {
   MONTH_NAMES, WEEKDAY_NAMES, dateKey, addDays, startOfWeek, daysInMonth, weekdayIndex,
   isSameDay, today, formatHoursShort,
@@ -45,6 +45,7 @@ export function renderWeekView(container, date, { fullDay, openDay }) {
       block.style.background = getLabelColor(entry.label);
       block.title = entry.note ? `${entry.label}\n${entry.note}` : entry.label;
       if (end - start >= 45) block.append(labelChip(entry.label));
+      if (entry.note) block.append(noteMarker());
       body.append(block);
     }
 
