@@ -193,6 +193,52 @@ export function deleteBlock(key, slot) {
   dataChanged();
 }
 
+// Boundary b is where slot b-1 meets slot b (0..SLOTS_PER_DAY).
+// It is a block edge when the slots on either side differ.
+export function isBlockEdge(key, boundary) {
+  const slots = getSlots(key);
+  return !sameSlot(slots[boundary - 1], slots[boundary]);
+}
+
+// How far a block edge may move: until the block on either side would vanish
+// (each keeps at least one slot); empty time on either side may be used up.
+export function boundaryLimits(key, boundary) {
+  return limitsOfBoundary(getSlots(key), boundary);
+}
+
+// Drag a block edge to newBoundary: the side it moves into takes over those slots.
+export function moveBoundary(key, boundary, newBoundary) {
+  const slots = getSlots(key);
+  const [min, max] = limitsOfBoundary(slots, boundary);
+  const target = Math.min(Math.max(newBoundary, min), max);
+  if (target === boundary) return;
+  if (target > boundary) {
+    for (let slot = boundary; slot < target; slot++) slots[slot] = slots[boundary - 1];
+  } else {
+    for (let slot = target; slot < boundary; slot++) slots[slot] = slots[boundary];
+  }
+  storeSlots(key, slots);
+  dataChanged();
+}
+
+function limitsOfBoundary(slots, boundary) {
+  const left = slots[boundary - 1] ?? null;
+  const right = slots[boundary] ?? null;
+  let leftRunStart = boundary;
+  while (leftRunStart > 0 && sameSlot(slots[leftRunStart - 1], left)) leftRunStart--;
+  let rightRunEnd = boundary;
+  while (rightRunEnd < slots.length && sameSlot(slots[rightRunEnd], right)) rightRunEnd++;
+  return [left ? leftRunStart + 1 : leftRunStart, right ? rightRunEnd - 1 : rightRunEnd];
+}
+
+// Two slots are the same when both are empty, or both have the same label and note.
+function sameSlot(a, b) {
+  const first = a ?? null;
+  const second = b ?? null;
+  if (first === null || second === null) return first === second;
+  return first.label === second.label && first.note === second.note;
+}
+
 function noteToInherit(slots, firstSlot, lastSlot, label) {
   const candidates = [firstSlot - 1, lastSlot + 1];
   for (let slot = firstSlot; slot <= lastSlot; slot++) candidates.push(slot);
@@ -255,13 +301,12 @@ function pickNewLabelColor() {
 
 // Collapse runs of equal slots (same label and note) into entries.
 function slotsToEntries(slots) {
-  const sameAs = (a, b) => (a === null || b === null ? a === b : a.label === b.label && a.note === b.note);
   const entries = [];
   let runStart = 0;
   while (runStart < slots.length) {
     const slot = slots[runStart];
     let runEnd = runStart;
-    while (runEnd < slots.length && sameAs(slots[runEnd], slot)) runEnd++;
+    while (runEnd < slots.length && sameSlot(slots[runEnd], slot)) runEnd++;
     if (slot) {
       const entry = { start: runStart * SLOT_MINUTES, end: runEnd * SLOT_MINUTES, label: slot.label };
       if (slot.note) entry.note = slot.note;

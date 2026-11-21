@@ -74,6 +74,12 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 }
 .hidden-note { margin: 8px 0 0 52px; }
 
+/* ---------- dragging block edges ---------- */
+.drag-time {
+  position: absolute; right: 8px; transform: translateY(-50%); z-index: 3; pointer-events: none;
+  background: var(--text); color: #fff; font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 3px;
+}
+
 /* ---------- notes ---------- */
 .day-page {
   display: grid; gap: 16px; align-items: start; justify-content: start;

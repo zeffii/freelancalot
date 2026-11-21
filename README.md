@@ -16,6 +16,8 @@ Leave the console window open while you use it. Closing it stops the server.
 - **Day view**: drag across slots to select them, then type a label. Existing labels
   are suggested as you type: ↑/↓ to choose, Tab to fill in, Enter to assign, Escape to cancel.
   Select already-labelled slots to relabel them, or use "Clear slots" to empty them.
+  Drag the top or bottom edge of a block to change its start or end (where two blocks
+  touch, this moves the boundary between them).
   Shows 07:00–23:00. Tick "Show 24 h" for the whole day.
 - **Notes**: after labelling, a note panel opens on the right. Click any block to see or
   edit its note, change its label or delete it. Each block has its own note, so blocks with

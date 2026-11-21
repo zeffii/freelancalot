@@ -4,6 +4,7 @@ import { el, labelChip, noteMarker } from './dom.js';
 import { dateKey, formatTime, formatDuration, formatLongDate } from './dates.js';
 import {
   SLOT_MINUTES, SLOTS_PER_DAY, getEntries, getLabelColor, findEntryAt, assignSlots,
+  isBlockEdge, boundaryLimits, moveBoundary,
 } from './store.js';
 import { openLabelPopover } from './labelPopover.js';
 import { renderNotePanel } from './notePanel.js';
@@ -13,6 +14,7 @@ const ROW_HEIGHT = 13;          // pixels per 15-minute slot
 const DEFAULT_FIRST_HOUR = 7;
 const DEFAULT_LAST_HOUR = 23;
 const SLOTS_PER_HOUR = 60 / SLOT_MINUTES;
+const EDGE_GRAB_PIXELS = 4;    // how close to a block edge counts as grabbing it
 
 // The selected block, kept across redraws: a slot inside it on a given day.
 let selected = null;           // { key, slot }
@@ -35,7 +37,7 @@ export function renderDayView(container, date, { fullDay, rerender }) {
   grid.style.height = gridHeight;
 
   drawRowsAndTimes(grid, gutter, firstSlot, endSlot, slotTop);
-  const hiddenMinutes = drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry);
+  const { hiddenMinutes, blockElements } = drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry);
 
   const selectionBox = el('div', 'selection-box');
   grid.append(selectionBox);
@@ -86,6 +88,14 @@ export function renderDayView(container, date, { fullDay, rerender }) {
       return true;
     },
     selectionFinished: askForLabel,
+    edgeAt(offsetY) {
+      const boundary = firstSlot + Math.round(offsetY / ROW_HEIGHT);
+      const nearLine = Math.abs(offsetY - slotTop(boundary)) <= EDGE_GRAB_PIXELS;
+      return nearLine && boundary > firstSlot - 1 && boundary <= endSlot && isBlockEdge(key, boundary) ? boundary : null;
+    },
+    startEdgeDrag(boundary) {
+      return createEdgeDrag({ grid, key, boundary, firstSlot, endSlot, slotTop, blockElements });
+    },
   });
 
   layout.append(gutter, grid);
@@ -129,9 +139,11 @@ function addGutterTime(gutter, slot, slotTop) {
   gutter.append(time);
 }
 
-// Draws the labelled blocks; returns minutes that fall outside the visible hours.
+// Draws the labelled blocks. Returns the minutes that fall outside the visible
+// hours, and each block's element with its slot range (for edge dragging).
 function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry) {
   let hiddenMinutes = 0;
+  const blockElements = [];
   for (const entry of getEntries(key)) {
     const start = Math.max(entry.start / SLOT_MINUTES, firstSlot);
     const end = Math.min(entry.end / SLOT_MINUTES, endSlot);
@@ -152,22 +164,60 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry) {
       block.title = entry.note;
     }
     grid.append(block);
+    blockElements.push({ element: block, startSlot: entry.start / SLOT_MINUTES, endSlot: entry.end / SLOT_MINUTES });
   }
-  return hiddenMinutes;
+  return { hiddenMinutes, blockElements };
+}
+
+// Dragging a block edge: blocks on both sides are resized on screen while
+// dragging (with the new time shown); the change is saved on drop.
+function createEdgeDrag({ grid, key, boundary, firstSlot, endSlot, slotTop, blockElements }) {
+  const [min, max] = boundaryLimits(key, boundary);
+  const above = blockElements.find((block) => block.endSlot === boundary);
+  const below = blockElements.find((block) => block.startSlot === boundary);
+  const timeTag = el('div', 'drag-time');
+  grid.append(timeTag);
+  let target = boundary;
+
+  const place = (element, start, end) => {
+    const visibleStart = Math.max(start, firstSlot);
+    const visibleEnd = Math.min(end, endSlot);
+    element.style.top = `${slotTop(visibleStart) + 1}px`;
+    element.style.height = `${Math.max(0, (visibleEnd - visibleStart) * ROW_HEIGHT - 1)}px`;
+  };
+
+  return {
+    moveTo(newBoundary) {
+      target = Math.min(Math.max(newBoundary, min), max);
+      if (above) place(above.element, above.startSlot, target);
+      if (below) place(below.element, target, below.endSlot);
+      timeTag.textContent = formatTime(target * SLOT_MINUTES);
+      timeTag.style.top = `${slotTop(target)}px`;
+    },
+    drop() {
+      timeTag.remove();
+      if (target !== boundary) moveBoundary(key, boundary, target); // redraws the view
+    },
+  };
 }
 
 // Press on a slot, drag up or down, release: the slots in between are selected.
 // A click without dragging on a labelled slot goes to clickedSlot instead.
-function setupSlotSelection(grid, { firstSlot, endSlot, showSelection, clickedSlot, selectionFinished }) {
+// Pressing on a block edge (top or bottom) drags that edge instead.
+function setupSlotSelection(grid, {
+  firstSlot, endSlot, showSelection, clickedSlot, selectionFinished, edgeAt, startEdgeDrag,
+}) {
   let anchorSlot = null;
   let currentSlot = null;
   let dragged = false;
+  let edgeDrag = null;
 
+  const offsetYOf = (event) => event.clientY - grid.getBoundingClientRect().top;
   const slotAt = (event) => {
-    const offsetY = event.clientY - grid.getBoundingClientRect().top;
-    const slot = firstSlot + Math.floor(offsetY / ROW_HEIGHT);
+    const slot = firstSlot + Math.floor(offsetYOf(event) / ROW_HEIGHT);
     return Math.min(Math.max(slot, firstSlot), endSlot - 1);
   };
+  const boundaryAt = (event) => firstSlot + Math.round(offsetYOf(event) / ROW_HEIGHT);
   const orderedRange = () => [Math.min(anchorSlot, currentSlot), Math.max(anchorSlot, currentSlot)];
 
   grid.addEventListener('pointerdown', (event) => {
@@ -175,14 +225,26 @@ function setupSlotSelection(grid, { firstSlot, endSlot, showSelection, clickedSl
     document.activeElement?.blur(); // saves a note being edited…
     if (!grid.isConnected) return; // …which redraws the view, so this grid is gone
     grid.querySelector('.label-popover')?.closeLabelPopover();
-    anchorSlot = currentSlot = slotAt(event);
-    dragged = false;
     grid.setPointerCapture(event.pointerId);
     event.preventDefault();
+    anchorSlot = currentSlot = slotAt(event);
+    dragged = false;
+
+    const edge = edgeAt(offsetYOf(event));
+    if (edge !== null) edgeDrag = { boundary: edge, drag: null };
   });
 
   grid.addEventListener('pointermove', (event) => {
-    if (anchorSlot === null) return;
+    if (anchorSlot === null) {
+      grid.style.cursor = edgeAt(offsetYOf(event)) !== null ? 'ns-resize' : '';
+      return;
+    }
+    if (edgeDrag) {
+      const boundary = boundaryAt(event);
+      if (boundary !== edgeDrag.boundary && !edgeDrag.drag) edgeDrag.drag = startEdgeDrag(edgeDrag.boundary);
+      edgeDrag.drag?.moveTo(boundary);
+      return;
+    }
     const slot = slotAt(event);
     if (slot !== anchorSlot) dragged = true;
     currentSlot = slot;
@@ -192,7 +254,15 @@ function setupSlotSelection(grid, { firstSlot, endSlot, showSelection, clickedSl
   grid.addEventListener('pointerup', () => {
     if (anchorSlot === null) return;
     const [first, last] = orderedRange();
+    const finishedEdgeDrag = edgeDrag;
     anchorSlot = currentSlot = null;
+    edgeDrag = null;
+
+    if (finishedEdgeDrag?.drag) {
+      finishedEdgeDrag.drag.drop();
+      return;
+    }
+    // A press on an edge that didn't move counts as a plain click.
     if (!dragged && clickedSlot(first)) return;
     selectionFinished(first, last);
   });
