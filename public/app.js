@@ -7,6 +7,7 @@ import {
 } from './store.js';
 import { renderDayView } from './dayView.js';
 import { renderWeekView, renderMonthView, renderYearView } from './calendarViews.js';
+import { openReportDialog } from './reportDialog.js';
 
 const FULL_DAY_SETTING = 'timesheet.fullDay';
 
@@ -108,6 +109,7 @@ function wireToolbar() {
     render();
   });
 
+  document.getElementById('pdfButton').addEventListener('click', () => openReportDialog(state));
   document.getElementById('exportButton').addEventListener('click', downloadExport);
   const importFile = document.getElementById('importFile');
   document.getElementById('importButton').addEventListener('click', () => importFile.click());
@@ -123,7 +125,7 @@ function wireToolbar() {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.target.closest('input, textarea')) return;
+    if (event.target.closest('input, textarea') || document.querySelector('.modal-backdrop, .report-preview')) return;
     if (event.key === 'ArrowLeft') step(-1);
     if (event.key === 'ArrowRight') step(1);
   });

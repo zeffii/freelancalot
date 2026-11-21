@@ -23,18 +23,22 @@ Leave the console window open while you use it. Closing it stops the server.
   Ctrl+Enter or clicking away saves.
 - **Week / Month / Year**: overview. Click a day to open it, click a month name in year view to open that month.
 - Every view lists hours per label underneath. Click a label's colour square to change its colour, or its name to rename it (renaming to an existing name merges the two).
+- **Export PDF**: pick a period, the labels to include and whether to include notes, then
+  preview the report and save it with "Save as PDF" in the print dialog. Only days with time
+  for those labels are listed, with a total per day (when it has several blocks), per label
+  and overall.
 - ← / → step back and forward.
 
 ## Online copy
 
 https://zeffii.github.io/freelancalot/ runs the same app without the server. There it saves
-in the browser (localStorage) instead of `timesheet.json`. Use Export / Import to move data
+in the browser (localStorage) instead of `timesheet.json`. Use Export JSON / Import JSON to move data
 between the two.
 
 ## Data
 
 Everything is saved to `timesheet.json` next to `server.js`, shortly after each change.
-The previous version is kept as `timesheet.json.bak`. Back up or sync `timesheet.json` as you like. Export downloads the same file; Import replaces all data with one.
+The previous version is kept as `timesheet.json.bak`. Back up or sync `timesheet.json` as you like. Export JSON downloads the same file; Import JSON replaces all data with one.
 
 ## Files
 
@@ -43,4 +47,5 @@ The previous version is kept as `timesheet.json.bak`. Back up or sync `timesheet
 - `public/dayView.js`, `public/labelPopover.js`, `public/notePanel.js`: day view, the label box and the note panel
 - `public/calendarViews.js`: week, month and year views
 - `public/summary.js`: the hours per label list
+- `public/report.js`, `public/reportDialog.js`: the PDF report and its dialog
 - `public/app.js`: toolbar and switching between views
