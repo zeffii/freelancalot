@@ -5,7 +5,7 @@ import { SLOT_MINUTES, SLOTS_PER_DAY, getEntries, getLabelColor } from './store.
 import { openLabelPopover } from './labelPopover.js';
 import { renderSummary } from './summary.js';
 
-const ROW_HEIGHT = 26;          // pixels per 15-minute slot
+const ROW_HEIGHT = 13;          // pixels per 15-minute slot
 const DEFAULT_FIRST_HOUR = 7;
 const DEFAULT_LAST_HOUR = 23;
 const SLOTS_PER_HOUR = 60 / SLOT_MINUTES;
@@ -83,7 +83,7 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop) {
 
     const block = el('div', 'time-block');
     block.style.top = `${slotTop(start) + 1}px`;
-    block.style.height = `${(end - start) * ROW_HEIGHT - 2}px`;
+    block.style.height = `${(end - start) * ROW_HEIGHT - 1}px`;
     block.style.background = getLabelColor(entry.label);
 
     const timeChip = labelChip(`${formatTime(entry.start)}–${formatTime(entry.end)} · ${formatDuration(entry.end - entry.start)}`);

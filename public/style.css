@@ -61,10 +61,11 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 .slot-line.hour { border-top: 1px solid var(--line-strong); }
 .slot-line:first-child { border-top: none; }
 .time-block {
-  position: absolute; left: 4px; right: 4px; border-radius: 4px; padding: 3px 6px;
+  position: absolute; left: 4px; right: 4px; border-radius: 3px; padding: 0 4px;
   box-sizing: border-box; display: flex; gap: 6px; align-items: flex-start;
   overflow: hidden; pointer-events: none;
 }
+.time-block .label-chip { font-size: 11px; line-height: 12px; }
 .time-chip { opacity: 0.85; }
 .selection-box {
   display: none; position: absolute; left: 0; right: 0; pointer-events: none;
