@@ -21,10 +21,16 @@ Leave the console window open while you use it. Closing it stops the server.
 - Every view lists hours per label underneath. Click a label's colour square to change its colour, or its name to rename it (renaming to an existing name merges the two).
 - ← / → step back and forward.
 
+## Online copy
+
+https://zeffii.github.io/freelancalot/ runs the same app without the server. There it saves
+in the browser (localStorage) instead of `timesheet.json`. Use Export / Import to move data
+between the two.
+
 ## Data
 
 Everything is saved to `timesheet.json` next to `server.js`, shortly after each change.
-The previous version is kept as `timesheet.json.bak`. Back up or sync `timesheet.json` as you like.
+The previous version is kept as `timesheet.json.bak`. Back up or sync `timesheet.json` as you like. Export downloads the same file; Import replaces all data with one.
 
 ## Files
 

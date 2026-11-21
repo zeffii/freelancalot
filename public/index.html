@@ -22,6 +22,11 @@
     <h1 id="title"></h1>
     <label class="toggle" id="fullDayToggle"><input type="checkbox" id="fullDayCheckbox"> Show 24 h</label>
     <span class="save-status" id="saveStatus"></span>
+    <div class="button-group">
+      <button id="exportButton" title="Download all data as a JSON file">Export</button>
+      <button id="importButton" title="Replace all data with a JSON file">Import</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
   </header>
   <main id="view"></main>
   <script type="module" src="app.js"></script>

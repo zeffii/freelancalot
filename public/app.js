@@ -2,7 +2,9 @@
 import {
   MONTH_NAMES, addDays, addMonths, startOfWeek, today, formatLongDate,
 } from './dates.js';
-import { loadData, onChange, onSaveStatus } from './store.js';
+import {
+  loadData, onChange, onSaveStatus, getStorageMode, exportJson, importJson,
+} from './store.js';
 import { renderDayView } from './dayView.js';
 import { renderWeekView, renderMonthView, renderYearView } from './calendarViews.js';
 
@@ -75,7 +77,12 @@ function render() {
 }
 
 function showSaveStatus(status) {
-  const messages = { saving: 'Saving…', saved: 'Saved', error: 'Not saved – is the server running?' };
+  const inBrowser = getStorageMode() === 'browser';
+  const messages = {
+    saving: 'Saving…',
+    saved: inBrowser ? 'Saved in this browser' : 'Saved',
+    error: inBrowser ? 'Not saved – browser storage refused' : 'Not saved – is the server running?',
+  };
   saveStatus.textContent = messages[status];
   saveStatus.className = `save-status ${status}`;
 }
@@ -101,11 +108,34 @@ function wireToolbar() {
     render();
   });
 
+  document.getElementById('exportButton').addEventListener('click', downloadExport);
+  const importFile = document.getElementById('importFile');
+  document.getElementById('importButton').addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', async () => {
+    const file = importFile.files[0];
+    importFile.value = '';
+    if (!file || !confirm(`Replace all current data with ${file.name}?`)) return;
+    try {
+      importJson(await file.text());
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+
   document.addEventListener('keydown', (event) => {
     if (event.target.closest('input, textarea')) return;
     if (event.key === 'ArrowLeft') step(-1);
     if (event.key === 'ArrowRight') step(1);
   });
+}
+
+function downloadExport() {
+  const blob = new Blob([exportJson()], { type: 'application/json' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'timesheet.json';
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 async function start() {
@@ -116,11 +146,9 @@ async function start() {
     const scrollY = render();
     window.scrollTo(0, scrollY);
   });
-  try {
-    await loadData();
-  } catch (error) {
-    showSaveStatus('error');
-    console.error(error);
+  await loadData();
+  if (getStorageMode() === 'browser') {
+    saveStatus.textContent = 'No server – saving in this browser';
   }
   render();
 }

@@ -18,7 +18,14 @@ const LABEL_PALETTE = [
 const FALLBACK_COLOR = '#888780';
 const SAVE_DELAY_MS = 400;
 
+// Where data is kept: 'server' writes timesheet.json through server.js;
+// 'browser' is the fallback when no server answers (e.g. the GitHub Pages copy)
+// and keeps the data in this browser's localStorage.
+const BROWSER_STORAGE_KEY = 'freelancalot.data';
+const API_URL = 'api/data'; // relative, so it also resolves under a sub-path
+
 let data = { labels: {}, days: {} };
+let storageMode = 'server';
 let saveTimer = null;
 let statusListener = () => {};
 let changeListener = () => {};
@@ -26,15 +33,24 @@ let changeListener = () => {};
 // ---------- loading and saving ----------
 
 export async function loadData() {
-  const response = await fetch('/api/data');
-  if (!response.ok) throw new Error(`Could not load data (${response.status})`);
-  data = await response.json();
-  data.labels ??= {};
-  data.days ??= {};
+  try {
+    const response = await fetch(API_URL);
+    if (!response.ok) throw new Error(`No server (${response.status})`);
+    setData(await response.json());
+  } catch {
+    storageMode = 'browser';
+    const stored = localStorage.getItem(BROWSER_STORAGE_KEY);
+    setData(stored ? JSON.parse(stored) : {});
+  }
 }
 
+export function getStorageMode() { return storageMode; }
 export function onSaveStatus(listener) { statusListener = listener; }
 export function onChange(listener) { changeListener = listener; }
+
+function setData(loaded) {
+  data = { labels: loaded.labels ?? {}, days: loaded.days ?? {} };
+}
 
 function dataChanged() {
   changeListener();
@@ -45,17 +61,37 @@ function dataChanged() {
 
 async function saveNow() {
   try {
-    const response = await fetch('/api/data', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error(`Save failed (${response.status})`);
+    if (storageMode === 'browser') {
+      localStorage.setItem(BROWSER_STORAGE_KEY, JSON.stringify(data));
+    } else {
+      const response = await fetch(API_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error(`Save failed (${response.status})`);
+    }
     statusListener('saved');
   } catch (error) {
     console.error(error);
     statusListener('error');
   }
+}
+
+// ---------- export and import (a timesheet.json file) ----------
+
+export function exportJson() {
+  return JSON.stringify(data, null, 2);
+}
+
+// Replaces all current data with the file's contents.
+export function importJson(text) {
+  const loaded = JSON.parse(text);
+  if (typeof loaded?.labels !== 'object' || typeof loaded?.days !== 'object') {
+    throw new Error('Not a timesheet file: expected { labels, days }');
+  }
+  setData(loaded);
+  dataChanged();
 }
 
 // ---------- reading ----------
