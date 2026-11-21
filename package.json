@@ -1,0 +1,10 @@
+{
+  "name": "freelancalot",
+  "version": "1.0.0",
+  "description": "Local calendar timesheet with 15-minute labelled slots, stored in timesheet.json",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  }
+}
