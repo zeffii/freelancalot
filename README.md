@@ -38,7 +38,11 @@ between the two.
 ## Data
 
 Everything is saved to `timesheet.json` next to `server.js`, shortly after each change.
-The previous version is kept as `timesheet.json.bak`. Back up or sync `timesheet.json` as you like. Export JSON downloads the same file; Import JSON replaces all data with one.
+The previous version is kept as `timesheet.json.bak`. Back up or sync `timesheet.json` as you like. Export JSON downloads the same file; Import JSON replaces all data with one, from a file
+or a link (GitHub, Dropbox and Google Drive share links are turned into direct downloads).
+Opening the app with `?load=<link>` in the address loads that file on start, after asking.
+Sites that block the browser from reading their files work when running the local server,
+which fetches them instead.
 
 ## Files
 

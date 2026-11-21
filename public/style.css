@@ -207,6 +207,8 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 .dialog-labels .muted { margin: 0; }
 .dialog-label-option { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .dialog-label-option .label-chip { border: 1px solid var(--line); }
+.dialog-link { flex: 1; font: inherit; padding: 4px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius); }
+.dialog-note { margin: 0 0 6px; font-size: 13px; }
 .dialog-error { color: var(--danger); min-height: 1em; margin: 8px 0; font-size: 13px; }
 .dialog-actions { display: flex; gap: 6px; }
 

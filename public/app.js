@@ -3,11 +3,12 @@ import {
   MONTH_NAMES, addDays, addMonths, startOfWeek, today, formatLongDate,
 } from './dates.js';
 import {
-  loadData, onChange, onSaveStatus, getStorageMode, exportJson, importJson,
+  loadData, onChange, onSaveStatus, getStorageMode, exportJson,
 } from './store.js';
 import { renderDayView } from './dayView.js';
 import { renderWeekView, renderMonthView, renderYearView } from './calendarViews.js';
 import { openReportDialog } from './reportDialog.js';
+import { openImportDialog, importFromAddressBar } from './importDialog.js';
 
 const FULL_DAY_SETTING = 'timesheet.fullDay';
 
@@ -111,18 +112,7 @@ function wireToolbar() {
 
   document.getElementById('pdfButton').addEventListener('click', () => openReportDialog(state));
   document.getElementById('exportButton').addEventListener('click', downloadExport);
-  const importFile = document.getElementById('importFile');
-  document.getElementById('importButton').addEventListener('click', () => importFile.click());
-  importFile.addEventListener('change', async () => {
-    const file = importFile.files[0];
-    importFile.value = '';
-    if (!file || !confirm(`Replace all current data with ${file.name}?`)) return;
-    try {
-      importJson(await file.text());
-    } catch (error) {
-      alert(error.message);
-    }
-  });
+  document.getElementById('importButton').addEventListener('click', openImportDialog);
 
   document.addEventListener('keydown', (event) => {
     if (event.target.closest('input, textarea') || document.querySelector('.modal-backdrop, .report-preview')) return;
@@ -153,6 +143,7 @@ async function start() {
     saveStatus.textContent = 'No server – saving in this browser';
   }
   render();
+  await importFromAddressBar();
 }
 
 start();

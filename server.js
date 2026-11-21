@@ -63,6 +63,35 @@ function readRequestBody(req) {
   });
 }
 
+// Fetches a timesheet file from a link for the browser, for sites that don't
+// allow pages to read their files directly (CORS). http(s) only, size-limited.
+async function handleFetchRequest(req, res) {
+  const target = new URL(req.url, 'http://localhost').searchParams.get('url');
+  let url;
+  try {
+    url = new URL(target);
+  } catch {
+    sendJson(res, 400, { error: 'Not a valid link' });
+    return;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    sendJson(res, 400, { error: 'Only http(s) links can be loaded' });
+    return;
+  }
+  const response = await fetch(url, { redirect: 'follow' });
+  if (!response.ok) {
+    sendJson(res, 502, { error: `The link answered ${response.status}` });
+    return;
+  }
+  const text = await response.text();
+  if (text.length > MAX_BODY_BYTES) {
+    sendJson(res, 413, { error: 'File too large' });
+    return;
+  }
+  res.writeHead(200, { 'Content-Type': MIME_TYPES['.json'] });
+  res.end(text);
+}
+
 async function handleDataRequest(req, res) {
   if (req.method === 'GET') {
     sendJson(res, 200, readData());
@@ -100,6 +129,8 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.url.startsWith('/api/data')) {
       await handleDataRequest(req, res);
+    } else if (req.url.startsWith('/api/fetch')) {
+      await handleFetchRequest(req, res);
     } else {
       serveStaticFile(req, res);
     }
