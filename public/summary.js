@@ -2,9 +2,8 @@
 // Click a colour square to change the colour, click a label name to rename it.
 import { el, labelChip } from './dom.js';
 import { formatDuration } from './dates.js';
-import {
-  minutesByLabel, getLabelColor, setLabelColor, renameLabel, labelExists,
-} from './store.js';
+import { getLabelColor, setLabelColor, renameLabel, labelExists } from './store.js';
+import { minutesByLabel, extraMinutes } from './accounting.js';
 
 export function renderSummary(keys, heading) {
   const totals = minutesByLabel(keys);
@@ -41,6 +40,15 @@ export function renderSummary(keys, heading) {
   const totalRow = el('div', 'summary-row summary-total');
   totalRow.append(el('span', '', 'Total'), el('span', 'summary-time', formatDuration(grandTotal)));
   section.append(totalRow);
+
+  // Time you logged yourself that the Revit journals don't cover.
+  const extra = extraMinutes(keys);
+  if (extra.counted || extra.notCounted) {
+    const parts = [];
+    if (extra.counted) parts.push(`${formatDuration(extra.counted)} counted`);
+    if (extra.notCounted) parts.push(`${formatDuration(extra.notCounted)} not counted`);
+    section.append(el('p', 'muted summary-extra', `Outside the Revit journals: ${parts.join(', ')}`));
+  }
   return section;
 }
 

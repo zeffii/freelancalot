@@ -2,7 +2,8 @@
 // Only days with logged time for the chosen labels appear.
 import { el, labelChip } from './dom.js';
 import { addDays, dateKey, formatTime, formatDuration, formatLongDate } from './dates.js';
-import { getEntries, getLabelColor, countedMinutes, countsNoFileTime, noFileMinutes } from './store.js';
+import { getLabelColor } from './store.js';
+import { minutesByLabel, countedRuns, extraMinutes } from './accounting.js';
 import { renderNoteText } from './notePanel.js';
 import { chosenDays, buildTimeline, buildWeekSummaries, buildDaySummaries } from './reportSections.js';
 
@@ -17,15 +18,9 @@ export function daysInRange(fromDate, toDate) {
   return days;
 }
 
-// Minutes per label over the period, for labels with any time in it.
+// Counted minutes per label over the period, for labels with any time in it.
 export function labelTotalsInRange(fromDate, toDate) {
-  const totals = new Map();
-  for (const day of daysInRange(fromDate, toDate)) {
-    for (const entry of getEntries(dateKey(day))) {
-      totals.set(entry.label, (totals.get(entry.label) ?? 0) + countedMinutes(entry));
-    }
-  }
-  return new Map([...totals].sort((a, b) => b[1] - a[1]));
+  return minutesByLabel(daysInRange(fromDate, toDate).map(dateKey));
 }
 
 // sections: { timeline, weeks, days } — which rich sections to include.
@@ -51,13 +46,6 @@ export function buildReport({ fromDate, toDate, labels, includeNotes, sections =
     report.append(buildLabelSection(label, totals.get(label), fromDate, toDate, includeNotes));
   }
   return report;
-}
-
-// A block's counted time; when no-file time is left out, says how much.
-function durationText(entry) {
-  const text = formatDuration(countedMinutes(entry));
-  const left = countsNoFileTime() ? 0 : noFileMinutes(entry);
-  return left ? `${text} (${formatDuration(left)} no file loaded, not counted)` : text;
 }
 
 function labelCell(label) {
@@ -91,12 +79,18 @@ function buildOverview(chosen, totals, fromDate, toDate) {
   let grandTotal = 0;
   for (const label of chosen) {
     const dayCount = daysInRange(fromDate, toDate)
-      .filter((day) => getEntries(dateKey(day)).some((entry) => entry.label === label)).length;
+      .filter((day) => countedRuns(dateKey(day), label).length > 0).length;
     grandTotal += totals.get(label);
     body.append(row([labelCell(label), String(dayCount), formatTotal(totals.get(label))]));
   }
   body.append(row(['Total', '', formatTotal(grandTotal)], 'report-total'));
   section.append(tableElement);
+
+  // Logged time outside the Revit journals that you chose not to count.
+  const extra = extraMinutes(daysInRange(fromDate, toDate).map(dateKey), chosen);
+  if (extra.notCounted) {
+    section.append(el('p', 'report-not-charged', `Not charged: ${formatDuration(extra.notCounted)} logged outside the Revit journals.`));
+  }
   return section;
 }
 
@@ -111,26 +105,28 @@ function buildLabelSection(label, labelMinutes, fromDate, toDate, includeNotes) 
   const headings = includeNotes ? ['Date', 'Time', 'Duration', 'Note'] : ['Date', 'Time', 'Duration'];
   const { tableElement, body } = table(headings, includeNotes ? 'with-notes' : '');
 
+  // One row per run of counted time; where your blocks and journal blocks
+  // overlap, the time shows once.
   for (const day of daysInRange(fromDate, toDate)) {
-    const blocks = getEntries(dateKey(day)).filter((entry) => entry.label === label);
-    if (blocks.length === 0) continue;
+    const runs = countedRuns(dateKey(day), label);
+    if (runs.length === 0) continue;
 
-    blocks.forEach((entry, index) => {
+    runs.forEach((run, index) => {
       const cells = [
         index === 0 ? formatLongDate(day) : '',
-        `${formatTime(entry.start)}–${formatTime(entry.end)}`,
-        durationText(entry),
+        `${formatTime(run.start)}–${formatTime(run.end)}`,
+        formatDuration(run.end - run.start),
       ];
       if (includeNotes) {
         const noteCell = el('td', 'report-note');
-        if (entry.note) noteCell.append(renderNoteText(entry.note));
+        for (const note of run.notes) noteCell.append(renderNoteText(note));
         cells.push(noteCell);
       }
       body.append(row(cells, index === 0 ? 'day-first' : ''));
     });
 
-    if (blocks.length > 1) {
-      const dayMinutes = blocks.reduce((sum, entry) => sum + countedMinutes(entry), 0);
+    if (runs.length > 1) {
+      const dayMinutes = runs.reduce((sum, run) => sum + run.end - run.start, 0);
       const cells = ['', 'Day total', formatDuration(dayMinutes)];
       if (includeNotes) cells.push('');
       body.append(row(cells, 'report-day-total'));

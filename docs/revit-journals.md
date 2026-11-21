@@ -154,10 +154,20 @@ pauses as work. 15 minutes is a fair middle and the default.
 3. Enter the **label** for the job, check the days, rules and ignored files.
 4. Check the preview: per day, the active time, the blocks and their total.
    Hover over a day to see the notes its blocks will get.
-5. **Add to timesheet.** Blocks only go into empty time; anything already logged
-   is left as it is, and you're told how much overlapped. To import the same
-   journals again (for example after an update to this feature), tick
-   **Replace this label's existing time on these days**: that label's blocks on
-   those days are replaced by the new ones.
+5. **Add to timesheet.** The blocks go into the journal layer (the right-hand lane
+   in day view). They are the evidence: they can't be resized, moved or relabelled.
+   You can leave a session out of the totals (tick box in the note panel, e.g. for
+   other work) or add your own remark; the journal data itself stays as imported.
+   Time you log yourself goes in the left-hand lane and may overlap the journal
+   blocks; overlapping time counts once.
+
+Each journal is one Revit session, identified by the moment it started. Sessions
+imported before are recognised and skipped, so you can simply import the whole
+Journals folder again next week. To import sessions again (for example after an
+update to this feature), tick **Import sessions again that were imported before**:
+that label's journal blocks on those days are replaced.
+
+Two Revit instances open at once write two journals; their time is combined
+(counted once) and both instances' files and actions appear in the blocks.
 
 Everything runs in your browser — the journals aren't uploaded anywhere.

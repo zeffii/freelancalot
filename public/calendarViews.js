@@ -5,8 +5,9 @@ import {
   isSameDay, today, formatHoursShort, formatTime,
 } from './dates.js';
 import {
-  SLOT_MINUTES, getEntries, getLabelColor, minutesOnDay, minutesByLabel, countsNoFileTime,
+  SLOT_MINUTES, getEntries, getJournalEntries, getLabelColor, countsNoFileTime,
 } from './store.js';
+import { minutesOnDay, minutesByLabel } from './accounting.js';
 import { renderSummary } from './summary.js';
 import { expandFileLists } from './notePanel.js';
 import { activityStrip, fileColors } from './activity.js';
@@ -71,15 +72,19 @@ export function renderWeekView(container, date, { fullDay, showNotes, showActivi
       line.style.top = `${(hour * 60 - firstMinute) * pixelsPerMinute}px`;
       body.append(line);
     }
-    for (const entry of getEntries(key)) {
+    // Two lanes, as in the day view: your blocks left, Revit journal blocks right.
+    const drawBlock = (entry, layer) => {
       const start = Math.max(entry.start, firstMinute);
       const end = Math.min(entry.end, endMinute);
-      if (end <= start) continue;
-      const block = el('div', 'week-block');
+      if (end <= start) return;
+      const classes = ['week-block', layer === 'journal' ? 'journal-block' : 'manual-block'];
+      if (entry.excluded) classes.push('excluded');
+      const block = el('div', classes.join(' '));
       block.style.top = `${(start - firstMinute) * pixelsPerMinute}px`;
       block.style.height = `${(end - start) * pixelsPerMinute - 1}px`;
       block.style.background = getLabelColor(entry.label);
-      block.title = entry.note ? `${entry.label}\n${entry.note}` : entry.label;
+      const note = layer === 'journal' ? [entry.userNote, entry.note].filter(Boolean).join('\n') : entry.note;
+      block.title = note ? `${entry.label}\n${note}` : entry.label;
       if (end - start >= 30) block.append(labelChip(entry.label));
       // File activity, when shown, takes the place of the note text (the bubble stays).
       const withActivity = Boolean(colors && entry.activity);
@@ -94,18 +99,21 @@ export function renderWeekView(container, date, { fullDay, showNotes, showActivi
           excludeNoFile: !countsNoFileTime(),
         }));
       }
-      if (entry.note) {
+      if (note) {
         const marker = noteMarker();
         block.append(marker);
         if (showNotes && !withActivity) {
-          const noteText = weekNote(entry.note);
+          const noteText = weekNote(note);
           block.append(noteText);
           const allowPartial = entry.end - entry.start >= PARTIAL_NOTE_MINUTES;
           notesToCheck.push({ noteText, marker, lines: [...noteText.children], allowPartial });
         }
       }
       body.append(block);
-    }
+    };
+    for (const entry of getEntries(key)) drawBlock(entry, 'manual');
+    for (const entry of getJournalEntries(key)) drawBlock(entry, 'journal');
+    if (getEntries(key).length && getJournalEntries(key).length) body.classList.add('two-lanes');
 
     column.append(header, body, dayLabelTotals(key));
     week.append(column);

@@ -3,7 +3,9 @@
 // check the preview, then add the blocks. They only fill empty time.
 import { el } from './dom.js';
 import { formatDuration, formatTime, formatLongDate } from './dates.js';
-import { addBlocks, getLabelNames } from './store.js';
+import {
+  addJournalBlocks, removeJournalBlocks, markSessionsImported, isSessionImported, getLabelNames,
+} from './store.js';
 import { parseJournal, analyseJournals, journalDateRange } from './revitJournal.js';
 import { unzipSync } from './vendor/fflate.js';
 
@@ -113,10 +115,12 @@ export function openJournalDialog() {
   filesCheckbox.checked = settings.includeFiles;
   filesToggle.append(filesCheckbox, ' List the models and families used in each block\'s note');
 
+  // Sessions imported before are skipped, unless importing them again is ticked
+  // (that replaces this label's journal blocks on those days).
   const replaceToggle = el('label', 'toggle');
   const replaceCheckbox = el('input');
   replaceCheckbox.type = 'checkbox';
-  replaceToggle.append(replaceCheckbox, ' Replace this label\'s existing time on these days (re-import)');
+  replaceToggle.append(replaceCheckbox, ' Import sessions again that were imported before (replaces their journal blocks)');
 
   const preview = el('div', 'journal-preview');
   const message = el('p', 'dialog-error');
@@ -147,12 +151,17 @@ export function openJournalDialog() {
   });
 
   let analysed = [];
+  const journalsToImport = () => (replaceCheckbox.checked ? journals : journals.filter((journal) => !isSessionImported(journal.sessionId)));
   function refreshPreview() {
     preview.replaceChildren();
     if (journals.length === 0) return;
-    analysed = analyseJournals(journals, readOptions());
+    analysed = analyseJournals(journalsToImport(), readOptions());
+    const skippedSessions = journals.length - journalsToImport().length;
+    if (skippedSessions) {
+      preview.append(el('p', 'muted dialog-note', `${skippedSessions} of ${journals.length} sessions were imported before and are skipped.`));
+    }
     if (analysed.length === 0) {
-      preview.append(el('p', 'muted', 'No Revit activity in these days.'));
+      preview.append(el('p', 'muted', skippedSessions ? 'Nothing new to import.' : 'No Revit activity in these days.'));
       return;
     }
     const table = el('table', 'journal-table');
@@ -235,7 +244,7 @@ export function openJournalDialog() {
   filesButton.addEventListener('click', () => filesInput.click());
   folderInput.addEventListener('change', () => readJournals(folderInput.files));
   filesInput.addEventListener('change', () => readJournals(filesInput.files));
-  for (const input of [fromInput, toInput, breakInput, minimumInput, ignoreInput, filesCheckbox]) {
+  for (const input of [fromInput, toInput, breakInput, minimumInput, ignoreInput, filesCheckbox, replaceCheckbox]) {
     input.addEventListener('change', refreshPreview);
   }
 
@@ -248,6 +257,10 @@ export function openJournalDialog() {
     const options = readOptions();
     if (journals.length === 0) {
       message.textContent = 'Choose the Journals folder or some journal files first.';
+      return;
+    }
+    if (analysed.length === 0) {
+      message.textContent = 'Nothing new to import: these sessions were all imported before.';
       return;
     }
     if (!options.label) {
@@ -265,12 +278,14 @@ export function openJournalDialog() {
     let added = 0;
     let skipped = 0;
     for (const day of analysed) {
-      const result = addBlocks(day.key, options.label, day.blocks, { replaceLabel: replaceCheckbox.checked });
+      if (replaceCheckbox.checked) removeJournalBlocks(day.key, options.label);
+      const result = addJournalBlocks(day.key, options.label, day.blocks);
       added += result.added;
       skipped += result.skipped;
     }
+    markSessionsImported(journalsToImport().map((journal) => journal.sessionId).filter(Boolean), options.label);
     close();
-    const skippedText = skipped ? `\n${formatDuration(skipped)} overlapped time already logged and was left as it was.` : '';
+    const skippedText = skipped ? `\n${formatDuration(skipped)} was already covered by imported time and was left as it was.` : '';
     alert(`Added ${formatDuration(added)} under "${options.label}".${skippedText}`);
   });
 }

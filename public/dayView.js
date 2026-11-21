@@ -1,11 +1,15 @@
 // Day view: 15-minute rows you drag across to select, then label.
 // Clicking a block selects it and shows its note in the panel on the right.
+// Two lanes: on the left the blocks you log yourself (editable), on the right
+// the blocks imported from Revit journals (the evidence, not editable).
 import { el, labelChip, noteMarker } from './dom.js';
 import { dateKey, formatTime, formatDuration, formatLongDate } from './dates.js';
 import {
   SLOT_MINUTES, SLOTS_PER_DAY, getEntries, getLabelColor, findEntryAt, assignSlots,
   isBlockEdge, boundaryLimits, moveBoundary, blockMoveLimits, moveBlock, countsNoFileTime,
+  getJournalEntries, findJournalEntryAt,
 } from './store.js';
+import { daySlots } from './accounting.js';
 import { openLabelPopover } from './labelPopover.js';
 import { renderNotePanel } from './notePanel.js';
 import { renderSummary } from './summary.js';
@@ -17,9 +21,11 @@ const DEFAULT_LAST_HOUR = 23;
 const SLOTS_PER_HOUR = 60 / SLOT_MINUTES;
 const EDGE_GRAB_PIXELS = 4;    // how close to a block edge counts as grabbing it
 const SELECTED_EDGE_GRAB_PIXELS = 7; // the selected block's handles are easier to grab
+const MANUAL_LANE_SHARE = 0.42;  // left part of the grid for your own blocks (matches the CSS)
 
-// The selected block, kept across redraws: a slot inside it on a given day.
-let selected = null;           // { key, slot }
+// The selected block, kept across redraws: a slot inside it on a given day,
+// and which lane it is in ('manual' or 'journal').
+let selected = null;           // { key, slot, layer }
 let editNoteOnNextDraw = false;
 
 export function renderDayView(container, date, { fullDay, showActivity, rerender }) {
@@ -29,7 +35,9 @@ export function renderDayView(container, date, { fullDay, showActivity, rerender
   const slotTop = (slot) => (slot - firstSlot) * ROW_HEIGHT;
   const gridHeight = `${(endSlot - firstSlot) * ROW_HEIGHT}px`;
 
-  const selectedEntry = selected?.key === key ? findEntryAt(key, selected.slot) : null;
+  const findIn = (layer, slot) => (layer === 'journal' ? findJournalEntryAt(key, slot) : findEntryAt(key, slot));
+  const selectedEntry = selected?.key === key ? findIn(selected.layer, selected.slot) : null;
+  const selectedManual = selected?.layer === 'manual' ? selectedEntry : null;
 
   const page = el('div', 'day-page');
   const layout = el('div', 'day-layout');
@@ -40,7 +48,9 @@ export function renderDayView(container, date, { fullDay, showActivity, rerender
 
   drawRowsAndTimes(grid, gutter, firstSlot, endSlot, slotTop);
   const colors = showActivity ? fileColors() : null;
-  const { hiddenMinutes, blockElements } = drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, colors);
+  grid.append(el('div', 'lane-divider'));
+  const { hiddenMinutes, blockElements } = drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedManual, colors);
+  const hiddenJournal = drawJournalBlocks(grid, key, firstSlot, endSlot, slotTop, selected?.layer === 'journal' ? selectedEntry : null, colors);
 
   const selectionBox = el('div', 'selection-box');
   grid.append(selectionBox);
@@ -53,10 +63,11 @@ export function renderDayView(container, date, { fullDay, showActivity, rerender
     selectionBox.style.display = 'none';
   };
 
-  const selectBlock = (slot, editNote = false) => {
-    selected = { key, slot };
+  const selectBlock = (slot, editNote = false, layer = 'manual') => {
+    selected = { key, slot, layer };
     editNoteOnNextDraw = editNote;
   };
+  const inManualLane = (offsetX) => offsetX < grid.clientWidth * MANUAL_LANE_SHARE;
 
   // Ask for a label for slots first..last, then select the resulting block.
   const askForLabel = (first, last) => {
@@ -83,18 +94,24 @@ export function renderDayView(container, date, { fullDay, showActivity, rerender
     firstSlot,
     endSlot,
     showSelection,
-    clickedSlot(slot) {
-      if (!findEntryAt(key, slot)) return false;
+    // A click selects the block in the lane clicked; if that lane is empty
+    // there, the block in the other lane.
+    clickedSlot(slot, offsetX) {
+      const order = inManualLane(offsetX) ? ['manual', 'journal'] : ['journal', 'manual'];
+      const layer = order.find((candidate) => findIn(candidate, slot));
+      if (!layer) return false;
       hideSelection();
-      selectBlock(slot);
+      selectBlock(slot, false, layer);
       rerender();
       return true;
     },
     selectionFinished: askForLabel,
-    edgeAt(offsetY) {
+    // Only your own blocks (left lane) have edges to drag.
+    edgeAt(offsetY, offsetX) {
+      if (!inManualLane(offsetX)) return null;
       // The selected block's top and bottom handles first, with a bigger grab zone.
-      if (selectedEntry) {
-        for (const minutes of [selectedEntry.start, selectedEntry.end]) {
+      if (selectedManual) {
+        for (const minutes of [selectedManual.start, selectedManual.end]) {
           const edge = minutes / SLOT_MINUTES;
           const visible = edge >= firstSlot && edge <= endSlot;
           if (visible && Math.abs(offsetY - slotTop(edge)) <= SELECTED_EDGE_GRAB_PIXELS) return edge;
@@ -107,8 +124,8 @@ export function renderDayView(container, date, { fullDay, showActivity, rerender
     startEdgeDrag(boundary) {
       return createEdgeDrag({ grid, key, boundary, firstSlot, endSlot, slotTop, blockElements });
     },
-    blockAt(slot) {
-      return findEntryAt(key, slot);
+    blockAt(slot, offsetX) {
+      return inManualLane(offsetX) ? findEntryAt(key, slot) : null;
     },
     startBlockMove(slot) {
       selectBlock(slot);
@@ -116,11 +133,14 @@ export function renderDayView(container, date, { fullDay, showActivity, rerender
     },
   });
 
-  layout.append(gutter, grid);
+  const laneTitles = el('div', 'lane-titles');
+  laneTitles.append(el('span', 'lane-title manual', 'Logged by you'), el('span', 'lane-title journal', 'Revit journals'));
+  layout.append(el('div'), laneTitles, gutter, grid);
   const notePanel = renderNotePanel({
     key,
     slot: selected?.slot,
     entry: selectedEntry,
+    layer: selected?.layer,
     startEditing: editNoteOnNextDraw,
     onChangeLabel: (entry) => askForLabel(entry.start / SLOT_MINUTES, entry.end / SLOT_MINUTES - 1),
     onDeleted: () => { selected = null; },
@@ -130,8 +150,8 @@ export function renderDayView(container, date, { fullDay, showActivity, rerender
   // Right-hand column: the note at the top, the day's hours at the bottom.
   const sideColumn = el('div', 'day-side');
   sideColumn.append(notePanel);
-  if (hiddenMinutes > 0) {
-    const note = `${formatDuration(hiddenMinutes)} logged outside ${formatTime(firstSlot * SLOT_MINUTES)}–${formatTime(endSlot * SLOT_MINUTES)}. Tick "Show 24 h" to see it.`;
+  if (hiddenMinutes + hiddenJournal > 0) {
+    const note = `${formatDuration(hiddenMinutes + hiddenJournal)} logged outside ${formatTime(firstSlot * SLOT_MINUTES)}–${formatTime(endSlot * SLOT_MINUTES)}. Tick "24 h" to see it.`;
     sideColumn.append(el('p', 'muted hidden-note', note));
   }
   sideColumn.append(renderSummary([key], `Hours on ${formatLongDate(date)}`));
@@ -157,12 +177,13 @@ function addGutterTime(gutter, slot, slotTop) {
   gutter.append(time);
 }
 
-// Draws the labelled blocks. Returns the minutes that fall outside the visible
-// hours, and each block's element with its slot range (for edge dragging).
-// With colors (File activity on), blocks with file activity get a histogram strip.
+// Draws your own blocks (left lane). Returns the minutes that fall outside the
+// visible hours, and each block's element with its slot range (for edge dragging).
+// Time outside the journals that isn't counted (countExtra off) is hatched.
 function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, colors) {
   let hiddenMinutes = 0;
   const blockElements = [];
+  const accounting = daySlots(key);
   for (const entry of getEntries(key)) {
     const start = Math.max(entry.start / SLOT_MINUTES, firstSlot);
     const end = Math.min(entry.end / SLOT_MINUTES, endSlot);
@@ -170,7 +191,7 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, color
     if (end <= start) continue;
 
     const isSelected = selectedEntry && selectedEntry.start === entry.start;
-    const block = el('div', isSelected ? 'time-block selected' : 'time-block');
+    const block = el('div', isSelected ? 'time-block manual-block selected' : 'time-block manual-block');
     block.style.top = `${slotTop(start) + 1}px`;
     block.style.height = `${(end - start) * ROW_HEIGHT - 1}px`;
     block.style.background = getLabelColor(entry.label);
@@ -183,6 +204,42 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, color
       block.append(noteMarker());
       block.title = entry.note;
     }
+    for (let slot = start; slot < end; slot++) {
+      const cell = accounting[slot];
+      if (cell?.kind !== 'extra' || cell.counted) continue;
+      const hatch = el('div', 'not-counted');
+      hatch.style.top = `${(slot - start) * ROW_HEIGHT - 1}px`;
+      hatch.style.height = `${ROW_HEIGHT}px`;
+      hatch.title = 'Outside the Revit journals · not counted';
+      block.append(hatch);
+    }
+    grid.append(block);
+    blockElements.push({ element: block, startSlot: entry.start / SLOT_MINUTES, endSlot: entry.end / SLOT_MINUTES });
+  }
+  return { hiddenMinutes, blockElements };
+}
+
+// Draws the blocks imported from Revit journals (right lane), with their file
+// activity strip when File activity is on. Excluded blocks are hatched grey.
+// Returns the minutes outside the visible hours.
+function drawJournalBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, colors) {
+  let hiddenMinutes = 0;
+  for (const entry of getJournalEntries(key)) {
+    const start = Math.max(entry.start / SLOT_MINUTES, firstSlot);
+    const end = Math.min(entry.end / SLOT_MINUTES, endSlot);
+    hiddenMinutes += (entry.end - entry.start) - Math.max(0, end - start) * SLOT_MINUTES;
+    if (end <= start) continue;
+
+    const classes = ['time-block', 'journal-block'];
+    if (selectedEntry && selectedEntry.start === entry.start) classes.push('selected');
+    if (entry.excluded) classes.push('excluded');
+    const block = el('div', classes.join(' '));
+    block.style.top = `${slotTop(start) + 1}px`;
+    block.style.height = `${(end - start) * ROW_HEIGHT - 1}px`;
+    block.style.background = getLabelColor(entry.label);
+    block.title = `From Revit journals${entry.excluded ? ' · excluded from totals' : ''}\n${entry.note ?? ''}`;
+    block.append(labelChip(entry.label));
+    if (entry.userNote) block.append(noteMarker());
     if (colors && entry.activity) {
       const blockTopMinute = start * SLOT_MINUTES;
       block.append(activityStrip(entry.activity, {
@@ -196,9 +253,8 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, color
       }));
     }
     grid.append(block);
-    blockElements.push({ element: block, startSlot: entry.start / SLOT_MINUTES, endSlot: entry.end / SLOT_MINUTES });
   }
-  return { hiddenMinutes, blockElements };
+  return hiddenMinutes;
 }
 
 // Dragging a block edge: blocks on both sides are resized on screen while
@@ -282,6 +338,8 @@ function setupSlotSelection(grid, {
   let blockMove = null;
 
   const offsetYOf = (event) => event.clientY - grid.getBoundingClientRect().top;
+  const offsetXOf = (event) => event.clientX - grid.getBoundingClientRect().left;
+  let pressedX = 0;
   const slotAt = (event) => {
     const slot = firstSlot + Math.floor(offsetYOf(event) / ROW_HEIGHT);
     return Math.min(Math.max(slot, firstSlot), endSlot - 1);
@@ -298,19 +356,20 @@ function setupSlotSelection(grid, {
     event.preventDefault();
     anchorSlot = currentSlot = slotAt(event);
     dragged = false;
+    pressedX = offsetXOf(event);
 
-    const edge = edgeAt(offsetYOf(event));
+    const edge = edgeAt(offsetYOf(event), pressedX);
     if (edge !== null) {
       edgeDrag = { boundary: edge, drag: null };
-    } else if (event.shiftKey && blockAt(anchorSlot)) {
+    } else if (event.shiftKey && blockAt(anchorSlot, pressedX)) {
       blockMove = { pressedSlot: anchorSlot, move: null };
     }
   });
 
   grid.addEventListener('pointermove', (event) => {
     if (anchorSlot === null) {
-      if (edgeAt(offsetYOf(event)) !== null) grid.style.cursor = 'ns-resize';
-      else if (event.shiftKey && blockAt(slotAt(event))) grid.style.cursor = 'move';
+      if (edgeAt(offsetYOf(event), offsetXOf(event)) !== null) grid.style.cursor = 'ns-resize';
+      else if (event.shiftKey && blockAt(slotAt(event), offsetXOf(event))) grid.style.cursor = 'move';
       else grid.style.cursor = '';
       return;
     }
@@ -350,7 +409,7 @@ function setupSlotSelection(grid, {
       return;
     }
     // A press on an edge that didn't move counts as a plain click.
-    if (!dragged && clickedSlot(first)) return;
+    if (!dragged && clickedSlot(first, pressedX)) return;
     selectionFinished(first, last);
   });
 }

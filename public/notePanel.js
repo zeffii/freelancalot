@@ -1,61 +1,79 @@
-// The panel to the right of the day view: shows and edits the note of the
-// selected block. Notes are plain text; URLs and [text](url) become links.
+// The panel to the right of the day view: shows the selected block.
+// - A block you logged: its note (editable), label, and whether its time
+//   outside the Revit journals counts.
+// - A block imported from Revit journals: read-only (it is the evidence), with
+//   its generated note, your own remark, file activity and actions, and a tick
+//   box to leave the session out of the totals.
+// Notes are plain text; URLs and [text](url) become links.
 import { el, labelChip } from './dom.js';
 import { formatTime, formatDuration } from './dates.js';
 import {
-  getLabelColor, setNote, deleteBlock, noFileMinutes, countsNoFileTime, countedMinutes,
+  getLabelColor, setNote, deleteBlock, noFileMinutes, countsNoFileTime, setCountExtra,
+  setJournalExcluded, setJournalUserNote,
 } from './store.js';
+import { blockAccounting } from './accounting.js';
 import { activityStrip, activityLegend, fileColors } from './activity.js';
 
 const ACTIVITY_OPEN_SETTING = 'timesheet.activityOpen';
 const ACTIONS_OPEN_SETTING = 'timesheet.actionsOpen';
 const FINE_ROW_HEIGHT = 6;   // pixels per 5-minute step in the expanded histogram
 
-// entry: the selected block, or null. startEditing: open the text box straight away.
-export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel, onDeleted }) {
+// entry: the selected block, or null; layer: 'manual' or 'journal'.
+// startEditing: open the note's text box straight away.
+export function renderNotePanel({ key, slot, entry, layer, startEditing, onChangeLabel, onDeleted }) {
   const panel = el('aside', 'note-panel');
-
   if (!entry) {
     panel.append(el('p', 'muted', 'Click a block to see or add its note. Drag across empty slots to log time.'));
     return panel;
   }
+  if (layer === 'journal') fillJournalPanel(panel, key, entry);
+  else fillManualPanel(panel, { key, slot, entry, startEditing, onChangeLabel, onDeleted });
+  return panel;
+}
 
+function panelHeader(entry, badge) {
   const header = el('div', 'note-header');
   const swatch = el('span', 'note-swatch');
   swatch.style.background = getLabelColor(entry.label);
   header.append(swatch, labelChip(entry.label));
-  const notCounted = countsNoFileTime() ? 0 : noFileMinutes(entry);
-  const countedText = notCounted ? ` · counted ${formatDuration(countedMinutes(entry))} (${formatDuration(notCounted)} no file loaded)` : '';
-  const range = el('div', 'muted note-range', `${formatTime(entry.start)}–${formatTime(entry.end)} · ${formatDuration(entry.end - entry.start)}${countedText}`);
+  if (badge) header.append(el('span', 'note-badge', badge));
+  return header;
+}
 
+function checkbox(text, checked, onChange) {
+  const label = el('label', 'toggle note-toggle');
+  const box = el('input');
+  box.type = 'checkbox';
+  box.checked = checked;
+  box.addEventListener('change', () => onChange(box.checked));
+  label.append(box, ` ${text}`);
+  return label;
+}
+
+// A note shown as text (click to edit) or as a text box. Returns the element
+// and an "Edit / Add" button for the panel's button row.
+function noteEditor({ text, placeholder, addText, editText, startEditing, onSave }) {
   const body = el('div', 'note-body');
-  const editButton = el('button', '', 'Edit note');
-  const labelButton = el('button', '', 'Change label');
-  const deleteButton = el('button', '', 'Delete block');
-  const actions = el('div', 'note-actions');
-  actions.append(editButton, labelButton, deleteButton);
+  const button = el('button', '', text ? editText : addText);
 
-  const showNote = () => {
+  const show = () => {
     body.replaceChildren();
-    editButton.style.display = '';
-    if (entry.note) {
-      const rendered = renderNoteText(entry.note);
-      rendered.title = 'Click to edit';
-      rendered.addEventListener('click', (event) => {
-        if (!event.target.closest('a')) showEditor();
-      });
-      body.append(rendered);
-    } else {
-      editButton.textContent = 'Add note';
-    }
+    button.style.display = '';
+    if (!text) return;
+    const rendered = renderNoteText(text);
+    rendered.title = 'Click to edit';
+    rendered.addEventListener('click', (event) => {
+      if (!event.target.closest('a')) edit();
+    });
+    body.append(rendered);
   };
 
-  const showEditor = () => {
+  const edit = () => {
     body.replaceChildren();
-    editButton.style.display = 'none';
+    button.style.display = 'none';
     const textarea = el('textarea', 'note-input');
-    textarea.value = entry.note ?? '';
-    textarea.placeholder = 'Note for this block. Paste a URL, or write [text](https://…)';
+    textarea.value = text ?? '';
+    textarea.placeholder = placeholder;
     body.append(textarea, el('div', 'muted note-hint', 'Ctrl+Enter or click away to save · Esc to cancel'));
     // The panel may not be on the page yet when this runs, so then focus once it is.
     if (textarea.isConnected) textarea.focus();
@@ -70,30 +88,98 @@ export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel,
       }
     });
     textarea.addEventListener('blur', () => {
-      const changed = textarea.value.trim() !== (entry.note ?? '');
-      if (!cancelled && changed) setNote(key, slot, textarea.value); // redraws the view
-      else showNote();
+      const changed = textarea.value.trim() !== (text ?? '');
+      if (!cancelled && changed) onSave(textarea.value); // redraws the view
+      else show();
     });
   };
 
-  editButton.addEventListener('click', showEditor);
+  button.addEventListener('click', edit);
+  if (startEditing) edit();
+  else show();
+  return { body, button };
+}
+
+// ---------- a block you logged ----------
+
+function fillManualPanel(panel, { key, slot, entry, startEditing, onChangeLabel, onDeleted }) {
+  const share = blockAccounting(key, entry);
+  const length = entry.end - entry.start;
+  let rangeText = `${formatTime(entry.start)}–${formatTime(entry.end)} · ${formatDuration(length)}`;
+  if (share.counted !== length) rangeText += ` · counted ${formatDuration(share.counted)}`;
+
+  const note = noteEditor({
+    text: entry.note,
+    placeholder: 'Note for this block. Paste a URL, or write [text](https://…)',
+    addText: 'Add note',
+    editText: 'Edit note',
+    startEditing,
+    onSave: (text) => setNote(key, slot, text),
+  });
+
+  const labelButton = el('button', '', 'Change label');
+  const deleteButton = el('button', '', 'Delete block');
   labelButton.addEventListener('click', () => onChangeLabel(entry));
   deleteButton.addEventListener('click', () => {
-    if (!confirm(`Delete this ${formatDuration(entry.end - entry.start)} block of "${entry.label}"?`)) return;
+    if (!confirm(`Delete this ${formatDuration(length)} block of "${entry.label}"?`)) return;
     onDeleted();
     deleteBlock(key, slot);
   });
+  const buttons = el('div', 'note-actions');
+  buttons.append(note.button, labelButton, deleteButton);
 
-  panel.append(header, range, body);
+  panel.append(panelHeader(entry), el('div', 'muted note-range', rangeText), note.body);
+  // Time in this block that the Revit journals don't cover ("extra" time).
+  if (share.extra) {
+    panel.append(checkbox(
+      `Count the ${formatDuration(share.extra)} outside the Revit journals`,
+      entry.countExtra !== false,
+      (checked) => setCountExtra(key, slot, checked),
+    ));
+  }
+  panel.append(buttons);
+}
+
+// ---------- a block from Revit journals ----------
+
+function fillJournalPanel(panel, key, entry) {
+  const share = blockAccounting(key, entry);
+  const length = entry.end - entry.start;
+  let rangeText = `${formatTime(entry.start)}–${formatTime(entry.end)} · ${formatDuration(length)}`;
+  if (entry.excluded) rangeText += ' · not counted';
+  else if (share.counted !== length) rangeText += ` · counted ${formatDuration(share.counted)}`;
+  const noFile = countsNoFileTime() ? 0 : noFileMinutes(entry);
+  if (noFile && !entry.excluded) rangeText += ` (${formatDuration(noFile)} no file loaded)`;
+
+  panel.append(panelHeader(entry, 'Revit journal'), el('div', 'muted note-range', rangeText));
+  if (entry.note) {
+    const generated = renderNoteText(entry.note);
+    generated.classList.add('note-generated');
+    panel.append(generated);
+  }
+
+  const remark = noteEditor({
+    text: entry.userNote,
+    placeholder: 'Your own remark on this session (the journal data itself is not changed)',
+    addText: 'Add my note',
+    editText: 'Edit my note',
+    startEditing: false,
+    onSave: (text) => setJournalUserNote(key, entry.start, text),
+  });
+  if (entry.userNote) panel.append(el('div', 'note-subheading', 'My note'));
+  panel.append(remark.body);
+
+  panel.append(checkbox(
+    'Leave this session out of the totals (e.g. it was other work)',
+    Boolean(entry.excluded),
+    (checked) => setJournalExcluded(key, entry.start, checked),
+  ));
   if (entry.activity) panel.append(activitySection(entry));
   if (entry.activity?.actions) panel.append(actionsSection(entry.activity.actions));
-  panel.append(actions);
-  if (startEditing) {
-    showEditor();
-  } else {
-    showNote();
-  }
-  return panel;
+
+  const buttons = el('div', 'note-actions');
+  buttons.append(remark.button);
+  panel.append(buttons);
 }
 
 // Expandable "File activity": the block's histogram in 5-minute steps, with

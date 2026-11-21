@@ -19,15 +19,22 @@ Leave the console window open while you use it. Closing it stops the server.
   Drag the top or bottom edge of a block to change its start or end (where two blocks
   touch, this moves the boundary between them). Shift+drag inside a block to move the whole
   block earlier or later; it stops at neighbouring blocks.
-  Shows 07:00–23:00. Tick "Show 24 h" for the whole day.
+  Shows 07:00–23:00. Tick "24 h" for the whole day.
 - **Notes**: after labelling, a note panel opens on the right. Click any block to see or
   edit its note, change its label or delete it. Each block has its own note, so blocks with
   the same label can have different notes. Paste a URL or write `[text](https://…)` for links.
   Ctrl+Enter or clicking away saves.
 - **Week / Month / Year**: overview. Click a day to open it, click a month name in year view to open that month.
 - Every view lists hours per label underneath. Click a label's colour square to change its colour, or its name to rename it (renaming to an existing name merges the two).
+- **Two layers**: day view has two lanes. On the left, the blocks you log yourself
+  (editable). On the right, the blocks imported from Revit journals: the evidence, which
+  can't be edited — only left out of the totals (e.g. a session that was other work) or
+  given your own remark. Where the two overlap, time counts once (your label wins). Time
+  you log outside the journals is "extra": it counts unless you untick it for that block,
+  and uncounted extra time shows hatched and as "not charged" in the PDF.
 - **Revit journals**: works out when Revit was in use from its journal files and adds
-  that time as blocks under a label (only into empty time). See
+  that time to the journal layer under a label. Sessions imported before are recognised
+  and skipped. See
   [docs/revit-journals.md](docs/revit-journals.md) for where the journals are, how long
   Revit keeps them, how to read them and how the hours are worked out.
 - **Export PDF**: pick a period, the labels to include, which sections (timeline, week
@@ -61,6 +68,7 @@ which fetches them instead.
 - `public/store.js`: the data and every change to it
 - `public/dayView.js`, `public/labelPopover.js`, `public/notePanel.js`: day view, the label box and the note panel
 - `public/calendarViews.js`: week, month and year views
+- `public/accounting.js`: what counts, per quarter-hour, from the two layers
 - `public/summary.js`: the hours per label list
 - `public/report.js`, `public/reportSections.js`, `public/reportDialog.js`: the PDF report, its timeline/week/day sections and its dialog
 - `public/revitJournal.js`, `public/journalDialog.js`: reading Revit journals (folder, files or zip) and their dialog

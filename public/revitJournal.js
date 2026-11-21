@@ -26,8 +26,10 @@ function cleanFileName(raw) {
 const TRANSACTION = /"Transaction Successful"\s*,\s*"([^"]*)"/;
 const SELECTION = /"SEL RESULT: (.*?)"\s*$/;
 
-// One journal file -> { inputTimes: [Date], fileMentions: [{ time, name }], saves,
-//   events: [{ time, type, name?, selection? }] }
+// One journal file -> { sessionId, inputTimes: [Date], fileMentions: [{ time, name }],
+//   saves, events: [{ time, type, name?, selection? }] }
+// sessionId is the time the journal started ("2026-11-18T08:44:58"): one Revit
+// session, used to recognise journals that were imported before.
 // event types: 'action' (a completed operation, with its name and, for deletes,
 // what was selected), 'undo', 'multiUndo', 'redo', 'save'.
 export function parseJournal(text) {
@@ -37,12 +39,14 @@ export function parseJournal(text) {
   let saves = 0;
   let currentTime = null;
   let lastSelection = null;
+  let sessionId = null;
 
   for (const line of text.split('\n')) {
     const stamp = STAMP.exec(line);
     if (stamp) {
       const [, kind, day, month, year, hours, minutes, seconds] = stamp;
       currentTime = new Date(+year, MONTHS[month.toLowerCase()], +day, +hours, +minutes, +seconds);
+      sessionId ??= `${year}-${String(MONTHS[month.toLowerCase()] + 1).padStart(2, '0')}-${day}T${hours}:${minutes}:${seconds}`;
       if (kind === 'E') inputTimes.push(currentTime);
       continue;
     }
@@ -58,7 +62,7 @@ export function parseJournal(text) {
       if (name) fileMentions.push({ time: currentTime, name });
     }
   }
-  return { inputTimes, fileMentions, saves, events };
+  return { sessionId, inputTimes, fileMentions, saves, events };
 }
 
 function recordEvent(line, time, events, setSelection, getSelection) {
