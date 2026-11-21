@@ -99,14 +99,17 @@ export function renderDayView(container, date, { fullDay, rerender }) {
   });
   editNoteOnNextDraw = false;
 
-  page.append(layout, notePanel);
-  container.append(page);
-
+  // Right-hand column: the note at the top, the day's hours at the bottom.
+  const sideColumn = el('div', 'day-side');
+  sideColumn.append(notePanel);
   if (hiddenMinutes > 0) {
     const note = `${formatDuration(hiddenMinutes)} logged outside ${formatTime(firstSlot * SLOT_MINUTES)}–${formatTime(endSlot * SLOT_MINUTES)}. Tick "Show 24 h" to see it.`;
-    container.append(el('p', 'muted hidden-note', note));
+    sideColumn.append(el('p', 'muted hidden-note', note));
   }
-  container.append(renderSummary([key], `Hours on ${formatLongDate(date)}`));
+  sideColumn.append(renderSummary([key], `Hours on ${formatLongDate(date)}`));
+
+  page.append(layout, sideColumn);
+  container.append(page);
 }
 
 function drawRowsAndTimes(grid, gutter, firstSlot, endSlot, slotTop) {

@@ -86,8 +86,11 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
   background: #fff; border-radius: 3px; width: 16px; height: 12px;
 }
 .week-block .note-marker { position: absolute; right: 2px; top: 2px; height: 13px; }
+.day-side { align-self: stretch; display: flex; flex-direction: column; gap: 12px; }
+.day-side .summary { margin-top: auto; }
+.day-side .hidden-note { margin: 0; }
 .note-panel {
-  position: sticky; top: 64px; background: var(--surface); border: 1px solid var(--line);
+  background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 12px 14px;
 }
 .note-panel > p { margin: 0; }
