@@ -6,6 +6,7 @@ import {
 } from './dates.js';
 import { SLOT_MINUTES, getEntries, getLabelColor, minutesOnDay, minutesByLabel } from './store.js';
 import { renderSummary } from './summary.js';
+import { expandFileLists } from './notePanel.js';
 
 // ---------- week ----------
 
@@ -15,24 +16,16 @@ const TIME_TICK_HOURS = 2;      // a time label every 2nd hour on the left
 // Notes as plain text for the small week blocks: [text](url) shows as text.
 const plainNote = (note) => note.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 
-// A file list line ("Models: a.rvt, b.rvt") becomes a heading plus one file per line.
-const FILE_LIST_LINE = /^(Models|Families):\s*(.*)$/;
+// Builds a week block's note: one file name per line under its heading, and
+// long names may wrap only after a delimiter (- _ . space), continuing on the
+// next row. Older one-line file lists are split up the same way.
 const looksLikeFileName = (text) => /\.(rvt|rfa|rte|rft|dwg|ifc|pdf)$/i.test(text.trim());
 
-// Builds a week block's note: one file name per line, and long names may wrap
-// only after a delimiter (- _ . space), so they continue on the next row.
 function weekNote(note) {
   const container = el('div', 'week-note');
-  for (const line of plainNote(note).split('\n')) {
-    const list = FILE_LIST_LINE.exec(line);
-    if (list) {
-      container.append(el('div', 'week-note-heading', `${list[1]}:`));
-      for (const name of list[2].split(/,\s*(?=\S)/).filter(Boolean)) container.append(fileNameLine(name));
-    } else if (looksLikeFileName(line)) {
-      container.append(fileNameLine(line.trim()));
-    } else {
-      container.append(el('div', /:$/.test(line.trim()) ? 'week-note-heading' : '', line));
-    }
+  for (const line of expandFileLists(plainNote(note)).split('\n')) {
+    if (looksLikeFileName(line)) container.append(fileNameLine(line.trim()));
+    else container.append(el('div', /:$/.test(line.trim()) ? 'week-note-heading' : '', line));
   }
   return container;
 }

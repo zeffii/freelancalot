@@ -87,8 +87,20 @@ export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel,
 // Matches [text](http…) or a bare http(s) URL.
 const LINK_PATTERN = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>]+[^\s<>.,;:!?)\]'"])/g;
 
+// Older journal notes list files on one line ("Models: a.rvt, b.rvt"); show
+// those as a heading with one file per line, the same as newer notes.
+// The stored note is not changed.
+const FILE_LIST_LINE = /^(Models|Families):\s*(\S.*)$/;
+export function expandFileLists(text) {
+  return text.split('\n').map((line) => {
+    const list = FILE_LIST_LINE.exec(line);
+    return list ? `${list[1]}:\n${list[2].split(/,\s*(?=\S)/).join('\n')}` : line;
+  }).join('\n');
+}
+
 // Builds the note as DOM nodes (never innerHTML), turning links into <a>.
-export function renderNoteText(text) {
+export function renderNoteText(note) {
+  const text = expandFileLists(note);
   const container = el('div', 'note-text');
   let position = 0;
   for (const match of text.matchAll(LINK_PATTERN)) {
