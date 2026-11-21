@@ -15,6 +15,7 @@ const DEFAULT_FIRST_HOUR = 7;
 const DEFAULT_LAST_HOUR = 23;
 const SLOTS_PER_HOUR = 60 / SLOT_MINUTES;
 const EDGE_GRAB_PIXELS = 4;    // how close to a block edge counts as grabbing it
+const SELECTED_EDGE_GRAB_PIXELS = 7; // the selected block's handles are easier to grab
 
 // The selected block, kept across redraws: a slot inside it on a given day.
 let selected = null;           // { key, slot }
@@ -89,9 +90,17 @@ export function renderDayView(container, date, { fullDay, rerender }) {
     },
     selectionFinished: askForLabel,
     edgeAt(offsetY) {
+      // The selected block's top and bottom handles first, with a bigger grab zone.
+      if (selectedEntry) {
+        for (const minutes of [selectedEntry.start, selectedEntry.end]) {
+          const edge = minutes / SLOT_MINUTES;
+          const visible = edge >= firstSlot && edge <= endSlot;
+          if (visible && Math.abs(offsetY - slotTop(edge)) <= SELECTED_EDGE_GRAB_PIXELS) return edge;
+        }
+      }
       const boundary = firstSlot + Math.round(offsetY / ROW_HEIGHT);
       const nearLine = Math.abs(offsetY - slotTop(boundary)) <= EDGE_GRAB_PIXELS;
-      return nearLine && boundary > firstSlot - 1 && boundary <= endSlot && isBlockEdge(key, boundary) ? boundary : null;
+      return nearLine && boundary >= firstSlot && boundary <= endSlot && isBlockEdge(key, boundary) ? boundary : null;
     },
     startEdgeDrag(boundary) {
       return createEdgeDrag({ grid, key, boundary, firstSlot, endSlot, slotTop, blockElements });
@@ -159,6 +168,7 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry) {
     const timeChip = labelChip(`${formatTime(entry.start)}–${formatTime(entry.end)} · ${formatDuration(entry.end - entry.start)}`);
     timeChip.classList.add('time-chip');
     block.append(labelChip(entry.label), timeChip);
+    if (isSelected) block.append(el('span', 'resize-handle top'), el('span', 'resize-handle bottom'));
     if (entry.note) {
       block.append(noteMarker());
       block.title = entry.note;
