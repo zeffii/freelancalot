@@ -4,7 +4,7 @@ import { el, labelChip, noteMarker } from './dom.js';
 import { dateKey, formatTime, formatDuration, formatLongDate } from './dates.js';
 import {
   SLOT_MINUTES, SLOTS_PER_DAY, getEntries, getLabelColor, findEntryAt, assignSlots,
-  isBlockEdge, boundaryLimits, moveBoundary,
+  isBlockEdge, boundaryLimits, moveBoundary, blockMoveLimits, moveBlock,
 } from './store.js';
 import { openLabelPopover } from './labelPopover.js';
 import { renderNotePanel } from './notePanel.js';
@@ -104,6 +104,13 @@ export function renderDayView(container, date, { fullDay, rerender }) {
     },
     startEdgeDrag(boundary) {
       return createEdgeDrag({ grid, key, boundary, firstSlot, endSlot, slotTop, blockElements });
+    },
+    blockAt(slot) {
+      return findEntryAt(key, slot);
+    },
+    startBlockMove(slot) {
+      selectBlock(slot);
+      return createBlockMove({ grid, key, slot, firstSlot, endSlot, slotTop, blockElements });
     },
   });
 
@@ -211,16 +218,53 @@ function createEdgeDrag({ grid, key, boundary, firstSlot, endSlot, slotTop, bloc
   };
 }
 
+// Shift+drag inside a block moves the whole block (keeping its length) into
+// empty time above or below; shown on screen while dragging, saved on drop.
+function createBlockMove({ grid, key, slot, firstSlot, endSlot, slotTop, blockElements }) {
+  const entry = findEntryAt(key, slot);
+  const startSlot = entry.start / SLOT_MINUTES;
+  const length = (entry.end - entry.start) / SLOT_MINUTES;
+  const [minDelta, maxDelta] = blockMoveLimits(key, slot);
+  const block = blockElements.find((candidate) => candidate.startSlot === startSlot);
+  const timeTag = el('div', 'drag-time');
+  grid.append(timeTag);
+  block?.element.classList.add('moving');
+  let delta = 0;
+
+  return {
+    moveBy(slots) {
+      delta = Math.min(Math.max(slots, minDelta), maxDelta);
+      const newStart = startSlot + delta;
+      if (block) {
+        const visibleStart = Math.max(newStart, firstSlot);
+        const visibleEnd = Math.min(newStart + length, endSlot);
+        block.element.style.top = `${slotTop(visibleStart) + 1}px`;
+        block.element.style.height = `${Math.max(0, (visibleEnd - visibleStart) * ROW_HEIGHT - 1)}px`;
+      }
+      timeTag.textContent = `${formatTime(newStart * SLOT_MINUTES)}–${formatTime((newStart + length) * SLOT_MINUTES)}`;
+      timeTag.style.top = `${slotTop(Math.max(newStart, firstSlot))}px`;
+    },
+    drop() {
+      timeTag.remove();
+      block?.element.classList.remove('moving');
+      if (delta !== 0) moveBlock(key, slot, delta); // redraws the view
+    },
+  };
+}
+
 // Press on a slot, drag up or down, release: the slots in between are selected.
 // A click without dragging on a labelled slot goes to clickedSlot instead.
-// Pressing on a block edge (top or bottom) drags that edge instead.
+// Pressing on a block edge (top or bottom) drags that edge instead, and
+// Shift+pressing inside a block moves the whole block.
 function setupSlotSelection(grid, {
   firstSlot, endSlot, showSelection, clickedSlot, selectionFinished, edgeAt, startEdgeDrag,
+  blockAt, startBlockMove,
 }) {
   let anchorSlot = null;
   let currentSlot = null;
   let dragged = false;
   let edgeDrag = null;
+  let blockMove = null;
 
   const offsetYOf = (event) => event.clientY - grid.getBoundingClientRect().top;
   const slotAt = (event) => {
@@ -241,12 +285,24 @@ function setupSlotSelection(grid, {
     dragged = false;
 
     const edge = edgeAt(offsetYOf(event));
-    if (edge !== null) edgeDrag = { boundary: edge, drag: null };
+    if (edge !== null) {
+      edgeDrag = { boundary: edge, drag: null };
+    } else if (event.shiftKey && blockAt(anchorSlot)) {
+      blockMove = { pressedSlot: anchorSlot, move: null };
+    }
   });
 
   grid.addEventListener('pointermove', (event) => {
     if (anchorSlot === null) {
-      grid.style.cursor = edgeAt(offsetYOf(event)) !== null ? 'ns-resize' : '';
+      if (edgeAt(offsetYOf(event)) !== null) grid.style.cursor = 'ns-resize';
+      else if (event.shiftKey && blockAt(slotAt(event))) grid.style.cursor = 'move';
+      else grid.style.cursor = '';
+      return;
+    }
+    if (blockMove) {
+      const delta = slotAt(event) - blockMove.pressedSlot;
+      if (delta !== 0 && !blockMove.move) blockMove.move = startBlockMove(blockMove.pressedSlot);
+      blockMove.move?.moveBy(delta);
       return;
     }
     if (edgeDrag) {
@@ -265,11 +321,17 @@ function setupSlotSelection(grid, {
     if (anchorSlot === null) return;
     const [first, last] = orderedRange();
     const finishedEdgeDrag = edgeDrag;
+    const finishedBlockMove = blockMove;
     anchorSlot = currentSlot = null;
     edgeDrag = null;
+    blockMove = null;
 
     if (finishedEdgeDrag?.drag) {
       finishedEdgeDrag.drag.drop();
+      return;
+    }
+    if (finishedBlockMove?.move) {
+      finishedBlockMove.move.drop();
       return;
     }
     // A press on an edge that didn't move counts as a plain click.

@@ -48,8 +48,9 @@ export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel,
     textarea.value = entry.note ?? '';
     textarea.placeholder = 'Note for this block. Paste a URL, or write [text](https://…)';
     body.append(textarea, el('div', 'muted note-hint', 'Ctrl+Enter or click away to save · Esc to cancel'));
-    // The panel may not be on the page yet when this runs, so focus once it is.
-    requestAnimationFrame(() => textarea.focus());
+    // The panel may not be on the page yet when this runs, so then focus once it is.
+    if (textarea.isConnected) textarea.focus();
+    else requestAnimationFrame(() => textarea.focus());
 
     let cancelled = false;
     textarea.addEventListener('keydown', (event) => {

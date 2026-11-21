@@ -221,6 +221,37 @@ export function moveBoundary(key, boundary, newBoundary) {
   dataChanged();
 }
 
+// How many slots the block at `slot` can move up (negative) or down (positive)
+// without running into another block or past the start/end of the day.
+export function blockMoveLimits(key, slot) {
+  return limitsOfBlockMove(getSlots(key), slot);
+}
+
+// Move a whole block (label and note) by delta slots; the time it leaves is emptied.
+export function moveBlock(key, slot, delta) {
+  const slots = getSlots(key);
+  const [first, last] = blockRange(slots, slot);
+  if (first === null) return;
+  const [minDelta, maxDelta] = limitsOfBlockMove(slots, slot);
+  const shift = Math.min(Math.max(delta, minDelta), maxDelta);
+  if (shift === 0) return;
+  const block = slots[first];
+  for (let s = first; s <= last; s++) slots[s] = null;
+  for (let s = first + shift; s <= last + shift; s++) slots[s] = block;
+  storeSlots(key, slots);
+  dataChanged();
+}
+
+function limitsOfBlockMove(slots, slot) {
+  const [first, last] = blockRange(slots, slot);
+  if (first === null) return [0, 0];
+  let freeBefore = 0;
+  while (first - freeBefore - 1 >= 0 && !slots[first - freeBefore - 1]) freeBefore++;
+  let freeAfter = 0;
+  while (last + freeAfter + 1 < slots.length && !slots[last + freeAfter + 1]) freeAfter++;
+  return [-freeBefore, freeAfter];
+}
+
 function limitsOfBoundary(slots, boundary) {
   const left = slots[boundary - 1] ?? null;
   const right = slots[boundary] ?? null;

@@ -82,6 +82,7 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 .resize-handle.top { top: -4px; }
 .resize-handle.bottom { bottom: -4px; }
 .time-block.selected { overflow: visible; }
+.time-block.moving { opacity: 0.85; z-index: 2; }
 .drag-time {
   position: absolute; right: 8px; transform: translateY(-50%); z-index: 3; pointer-events: none;
   background: var(--text); color: #fff; font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 3px;
