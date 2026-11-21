@@ -104,7 +104,7 @@ export function renderWeekView(container, date, { fullDay, showNotes, showActivi
       body.append(block);
     }
 
-    column.append(header, body);
+    column.append(header, body, dayLabelTotals(key));
     week.append(column);
   }
 
@@ -157,6 +157,21 @@ export function renderWeekView(container, date, { fullDay, showNotes, showActivi
     });
     observer.observe(week);
   }
+}
+
+// Under each day: time per label, one line per label (usually just one).
+function dayLabelTotals(key) {
+  const list = el('div', 'week-day-totals');
+  for (const [label, minutes] of minutesByLabel([key])) {
+    const line = el('div', 'week-day-total');
+    const swatch = el('span', 'week-day-swatch');
+    swatch.style.background = getLabelColor(label);
+    const name = el('span', 'week-day-label', label);
+    name.title = label;
+    line.append(swatch, name, el('span', 'week-day-time', formatHoursShort(minutes)));
+    list.append(line);
+  }
+  return list;
 }
 
 function timeGutter(firstMinute, endMinute, pixelsPerMinute, bodyHeight) {

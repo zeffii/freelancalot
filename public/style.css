@@ -204,6 +204,11 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
 .week-header.is-today { font-weight: 600; }
 .week-body { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .week-day:hover .week-body { border-color: var(--line-strong); }
+.week-day-totals { padding: 4px 2px 0; display: flex; flex-direction: column; gap: 2px; }
+.week-day-total { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.week-day-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.week-day-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.week-day-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .week-block {
   position: absolute; left: 2px; right: 2px; border-radius: 3px; padding: 2px; box-sizing: border-box; overflow: hidden;
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
