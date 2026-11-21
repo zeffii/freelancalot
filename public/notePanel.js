@@ -3,6 +3,10 @@
 import { el, labelChip } from './dom.js';
 import { formatTime, formatDuration } from './dates.js';
 import { getLabelColor, setNote, deleteBlock } from './store.js';
+import { activityStrip, activityLegend, fileColors } from './activity.js';
+
+const ACTIVITY_OPEN_SETTING = 'timesheet.activityOpen';
+const FINE_ROW_HEIGHT = 6;   // pixels per 5-minute step in the expanded histogram
 
 // entry: the selected block, or null. startEditing: open the text box straight away.
 export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel, onDeleted }) {
@@ -75,13 +79,49 @@ export function renderNotePanel({ key, slot, entry, startEditing, onChangeLabel,
     deleteBlock(key, slot);
   });
 
-  panel.append(header, range, body, actions);
+  panel.append(header, range, body);
+  if (entry.activity) panel.append(activitySection(entry));
+  panel.append(actions);
   if (startEditing) {
     showEditor();
   } else {
     showNote();
   }
   return panel;
+}
+
+// Expandable "File activity": the block's histogram in 5-minute steps, with
+// hour marks and each file's share. Whether it is open is remembered.
+function activitySection(entry) {
+  const details = el('details', 'activity-details');
+  details.open = localStorage.getItem(ACTIVITY_OPEN_SETTING) === 'true';
+  details.append(el('summary', '', 'File activity'));
+  details.addEventListener('toggle', () => localStorage.setItem(ACTIVITY_OPEN_SETTING, String(details.open)));
+
+  const colors = fileColors();
+  const step = entry.activity.binMinutes ?? 15;
+  const chart = el('div', 'activity-chart');
+  const height = ((entry.end - entry.start) / step) * FINE_ROW_HEIGHT;
+  const times = el('div', 'activity-times');
+  times.style.height = `${height}px`;
+  for (let minute = Math.ceil(entry.start / 60) * 60; minute <= entry.end; minute += 60) {
+    const tick = el('div', 'activity-tick', formatTime(minute));
+    tick.style.top = `${((minute - entry.start) / step) * FINE_ROW_HEIGHT}px`;
+    times.append(tick);
+  }
+  const strip = activityStrip(entry.activity, {
+    visibleStart: entry.start,
+    visibleEnd: entry.end,
+    top: (minute) => ((minute - entry.start) / step) * FINE_ROW_HEIGHT,
+    rowHeight: FINE_ROW_HEIGHT,
+    rowMinutes: step,
+    colors,
+    className: 'activity-fine',
+  });
+  strip.style.height = `${height}px`;
+  chart.append(times, strip);
+  details.append(chart, activityLegend(entry.activity, entry.start, entry.end, colors));
+  return details;
 }
 
 // Matches [text](http…) or a bare http(s) URL.

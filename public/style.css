@@ -90,6 +90,27 @@ button.primary { background: var(--text); color: var(--surface); border-color: v
   background: var(--text); color: #fff; font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 3px;
 }
 
+/* ---------- file activity (histograms) ---------- */
+.activity-strip {
+  position: absolute; right: 4px; top: 0; bottom: 0; width: min(150px, 45%);
+  background: #fff; border-radius: 2px; pointer-events: auto;
+}
+.week-block .activity-strip { right: 2px; width: 50%; }
+.week-block:has(.activity-strip) .label-chip { max-width: calc(50% - 28px); }
+.week-block:has(.activity-strip) .note-marker { right: calc(50% + 4px); }
+.activity-row { position: absolute; left: 1px; right: 1px; display: flex; overflow: hidden; }
+.activity-row > div { height: 100%; }
+.activity-details { margin: 0 0 10px; }
+.activity-details summary { cursor: pointer; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+.activity-chart { display: grid; grid-template-columns: 44px 1fr; margin-bottom: 8px; }
+.activity-times { position: relative; }
+.activity-tick { position: absolute; right: 6px; transform: translateY(-50%); font-size: 11px; color: var(--text-muted); }
+.activity-fine { position: relative; background: var(--surface-muted); border-radius: 3px; }
+.activity-legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 1px 0; }
+.activity-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.activity-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity-share { font-variant-numeric: tabular-nums; }
+
 /* ---------- notes ---------- */
 .day-page {
   display: grid; gap: 16px; align-items: start; justify-content: start;

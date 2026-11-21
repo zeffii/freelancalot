@@ -7,6 +7,7 @@ import {
 import { SLOT_MINUTES, getEntries, getLabelColor, minutesOnDay, minutesByLabel } from './store.js';
 import { renderSummary } from './summary.js';
 import { expandFileLists } from './notePanel.js';
+import { activityStrip, fileColors } from './activity.js';
 
 // ---------- week ----------
 
@@ -39,7 +40,7 @@ function fileNameLine(name) {
   return line;
 }
 
-export function renderWeekView(container, date, { fullDay, showNotes, openDay }) {
+export function renderWeekView(container, date, { fullDay, showNotes, showActivity, openDay }) {
   const firstMinute = fullDay ? 0 : 7 * 60;
   const endMinute = fullDay ? 24 * 60 : 23 * 60;
   const pixelsPerMinute = WEEK_ROW_HEIGHT / SLOT_MINUTES;
@@ -49,6 +50,7 @@ export function renderWeekView(container, date, { fullDay, showNotes, openDay })
   const week = el('div', 'week-grid');
   week.append(timeGutter(firstMinute, endMinute, pixelsPerMinute, bodyHeight));
   const notesToCheck = [];
+  const colors = showActivity ? fileColors() : null;
 
   for (const day of days) {
     const key = dateKey(day);
@@ -77,10 +79,22 @@ export function renderWeekView(container, date, { fullDay, showNotes, openDay })
       block.style.background = getLabelColor(entry.label);
       block.title = entry.note ? `${entry.label}\n${entry.note}` : entry.label;
       if (end - start >= 30) block.append(labelChip(entry.label));
+      // File activity, when shown, takes the place of the note text (the bubble stays).
+      const withActivity = Boolean(colors && entry.activity);
+      if (withActivity) {
+        block.append(activityStrip(entry.activity, {
+          visibleStart: start,
+          visibleEnd: end,
+          top: (minute) => (minute - start) * pixelsPerMinute,
+          rowHeight: WEEK_ROW_HEIGHT,
+          rowMinutes: SLOT_MINUTES,
+          colors,
+        }));
+      }
       if (entry.note) {
         const marker = noteMarker();
         block.append(marker);
-        if (showNotes) {
+        if (showNotes && !withActivity) {
           const noteText = weekNote(entry.note);
           block.append(noteText);
           const allowPartial = entry.end - entry.start >= PARTIAL_NOTE_MINUTES;

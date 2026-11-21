@@ -110,6 +110,11 @@ export function openJournalDialog() {
   filesCheckbox.checked = settings.includeFiles;
   filesToggle.append(filesCheckbox, ' List the models and families used in each block\'s note');
 
+  const replaceToggle = el('label', 'toggle');
+  const replaceCheckbox = el('input');
+  replaceCheckbox.type = 'checkbox';
+  replaceToggle.append(replaceCheckbox, ' Replace this label\'s existing time on these days (re-import)');
+
   const preview = el('div', 'journal-preview');
   const message = el('p', 'dialog-error');
   const addButton = el('button', 'primary', 'Add to timesheet');
@@ -124,7 +129,7 @@ export function openJournalDialog() {
   dialog.append(
     el('h2', '', 'Revit journals'),
     el('p', 'muted dialog-note', 'Works out when Revit was in use from its journal files, and adds that time as blocks. Only empty time is filled.'),
-    sourceRow, sourceStatus, labelRow, periodRow, rulesRow, ignoreRow, filesToggle, preview, message, actions,
+    sourceRow, sourceStatus, labelRow, periodRow, rulesRow, ignoreRow, filesToggle, replaceToggle, preview, message, actions,
   );
   document.body.append(backdrop);
 
@@ -249,7 +254,7 @@ export function openJournalDialog() {
     let added = 0;
     let skipped = 0;
     for (const day of analysed) {
-      const result = addBlocks(day.key, options.label, day.blocks);
+      const result = addBlocks(day.key, options.label, day.blocks, { replaceLabel: replaceCheckbox.checked });
       added += result.added;
       skipped += result.skipped;
     }

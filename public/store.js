@@ -8,6 +8,9 @@
 // start/end are minutes from midnight, always on 15-minute boundaries.
 // An entry may also have a "note" (free text, may contain links). Notes belong
 // to one block of time, so blocks with the same label can have different notes.
+// Blocks imported from Revit journals may carry "activity": which files were
+// worked in per 15 minutes, { start, files: [name], bins: [[count per file]] },
+// where start is the minute of day of the first bin.
 
 export const SLOT_MINUTES = 15;
 export const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES;
@@ -117,7 +120,7 @@ function getSlots(key) {
   const slots = new Array(SLOTS_PER_DAY).fill(null);
   for (const entry of getEntries(key)) {
     for (let slot = entry.start / SLOT_MINUTES; slot < entry.end / SLOT_MINUTES; slot++) {
-      slots[slot] = { label: entry.label, note: entry.note ?? '' };
+      slots[slot] = { label: entry.label, note: entry.note ?? '', activity: entry.activity };
     }
   }
   return slots;
@@ -181,14 +184,21 @@ export function assignSlots(key, firstSlot, lastSlot, label) {
   dataChanged();
 }
 
-// Add blocks [{ start, end, note }] with one label to a day, only into empty time
-// (existing blocks are never overwritten). Returns minutes added and skipped.
-export function addBlocks(key, label, blocks) {
+// Add blocks [{ start, end, note, activity }] with one label to a day, only into
+// empty time (other blocks are never overwritten). With replaceLabel, the day's
+// existing blocks with this label are removed first (re-importing).
+// Returns minutes added and skipped.
+export function addBlocks(key, label, blocks, { replaceLabel = false } = {}) {
   const slots = getSlots(key);
+  if (replaceLabel) {
+    for (let slot = 0; slot < slots.length; slot++) {
+      if (slots[slot]?.label === label) slots[slot] = null;
+    }
+  }
   let added = 0;
   let skipped = 0;
   for (const block of blocks) {
-    const value = { label, note: (block.note ?? '').trim() };
+    const value = { label, note: (block.note ?? '').trim(), activity: block.activity ?? undefined };
     for (let slot = block.start / SLOT_MINUTES; slot < block.end / SLOT_MINUTES; slot++) {
       if (slots[slot]) {
         skipped += SLOT_MINUTES;
@@ -198,9 +208,9 @@ export function addBlocks(key, label, blocks) {
       }
     }
   }
-  if (added) {
+  if (added || replaceLabel) {
     storeSlots(key, slots);
-    markLabelUsed(label);
+    if (added) markLabelUsed(label);
     dataChanged();
   }
   return { added, skipped };
@@ -214,7 +224,8 @@ export function setNote(key, slot, note) {
   const slots = getSlots(key);
   const [first, last] = blockRange(slots, slot);
   if (first === null) return;
-  for (let s = first; s <= last; s++) slots[s] = { label: slots[s].label, note: note.trim() };
+  const updated = { ...slots[first], note: note.trim() };
+  for (let s = first; s <= last; s++) slots[s] = updated;
   storeSlots(key, slots);
   dataChanged();
 }
@@ -270,7 +281,10 @@ export function moveBlock(key, slot, delta) {
   const [minDelta, maxDelta] = limitsOfBlockMove(slots, slot);
   const shift = Math.min(Math.max(delta, minDelta), maxDelta);
   if (shift === 0) return;
-  const block = slots[first];
+  // The block's file activity moves with it (it is stored by time of day).
+  const moved = slots[first];
+  const activity = moved.activity && { ...moved.activity, start: moved.activity.start + shift * SLOT_MINUTES };
+  const block = { ...moved, activity };
   for (let s = first; s <= last; s++) slots[s] = null;
   for (let s = first + shift; s <= last + shift; s++) slots[s] = block;
   storeSlots(key, slots);
@@ -302,7 +316,12 @@ function sameSlot(a, b) {
   const first = a ?? null;
   const second = b ?? null;
   if (first === null || second === null) return first === second;
-  return first.label === second.label && first.note === second.note;
+  return first.label === second.label && first.note === second.note && first.activity === second.activity;
+}
+
+// All file activity in the data (for giving every file one colour everywhere).
+export function getAllActivity() {
+  return Object.values(data.days).flat().map((entry) => entry.activity).filter(Boolean);
 }
 
 function noteToInherit(slots, firstSlot, lastSlot, label) {
@@ -312,10 +331,10 @@ function noteToInherit(slots, firstSlot, lastSlot, label) {
   return match === undefined ? '' : slots[match].note;
 }
 
-// First and last slot of the block (same label and note) around a slot.
+// First and last slot of the block (same label, note and activity) around a slot.
 function blockRange(slots, slot) {
   if (!slots[slot]) return [null, null];
-  const same = (s) => slots[s] && slots[s].label === slots[slot].label && slots[s].note === slots[slot].note;
+  const same = (s) => slots[s] && sameSlot(slots[s], slots[slot]);
   let first = slot;
   let last = slot;
   while (first > 0 && same(first - 1)) first--;
@@ -376,6 +395,7 @@ function slotsToEntries(slots) {
     if (slot) {
       const entry = { start: runStart * SLOT_MINUTES, end: runEnd * SLOT_MINUTES, label: slot.label };
       if (slot.note) entry.note = slot.note;
+      if (slot.activity) entry.activity = slot.activity;
       entries.push(entry);
     }
     runStart = runEnd;

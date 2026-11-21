@@ -9,6 +9,7 @@ import {
 import { openLabelPopover } from './labelPopover.js';
 import { renderNotePanel } from './notePanel.js';
 import { renderSummary } from './summary.js';
+import { activityStrip, fileColors } from './activity.js';
 
 const ROW_HEIGHT = 13;          // pixels per 15-minute slot
 const DEFAULT_FIRST_HOUR = 7;
@@ -21,7 +22,7 @@ const SELECTED_EDGE_GRAB_PIXELS = 7; // the selected block's handles are easier 
 let selected = null;           // { key, slot }
 let editNoteOnNextDraw = false;
 
-export function renderDayView(container, date, { fullDay, rerender }) {
+export function renderDayView(container, date, { fullDay, showActivity, rerender }) {
   const key = dateKey(date);
   const firstSlot = fullDay ? 0 : DEFAULT_FIRST_HOUR * SLOTS_PER_HOUR;
   const endSlot = fullDay ? SLOTS_PER_DAY : DEFAULT_LAST_HOUR * SLOTS_PER_HOUR;
@@ -38,7 +39,8 @@ export function renderDayView(container, date, { fullDay, rerender }) {
   grid.style.height = gridHeight;
 
   drawRowsAndTimes(grid, gutter, firstSlot, endSlot, slotTop);
-  const { hiddenMinutes, blockElements } = drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry);
+  const colors = showActivity ? fileColors() : null;
+  const { hiddenMinutes, blockElements } = drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, colors);
 
   const selectionBox = el('div', 'selection-box');
   grid.append(selectionBox);
@@ -157,7 +159,8 @@ function addGutterTime(gutter, slot, slotTop) {
 
 // Draws the labelled blocks. Returns the minutes that fall outside the visible
 // hours, and each block's element with its slot range (for edge dragging).
-function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry) {
+// With colors (File activity on), blocks with file activity get a histogram strip.
+function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry, colors) {
   let hiddenMinutes = 0;
   const blockElements = [];
   for (const entry of getEntries(key)) {
@@ -179,6 +182,17 @@ function drawBlocks(grid, key, firstSlot, endSlot, slotTop, selectedEntry) {
     if (entry.note) {
       block.append(noteMarker());
       block.title = entry.note;
+    }
+    if (colors && entry.activity) {
+      const blockTopMinute = start * SLOT_MINUTES;
+      block.append(activityStrip(entry.activity, {
+        visibleStart: start * SLOT_MINUTES,
+        visibleEnd: end * SLOT_MINUTES,
+        top: (minute) => ((minute - blockTopMinute) / SLOT_MINUTES) * ROW_HEIGHT,
+        rowHeight: ROW_HEIGHT,
+        rowMinutes: SLOT_MINUTES,
+        colors,
+      }));
     }
     grid.append(block);
     blockElements.push({ element: block, startSlot: entry.start / SLOT_MINUTES, endSlot: entry.end / SLOT_MINUTES });

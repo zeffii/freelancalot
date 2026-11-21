@@ -93,6 +93,13 @@ Saves show up as `ID_REVIT_FILE_SAVE`.
    (`.rfa`) named in the journal during that block, one per line, most used first. Revit's
    backup copies (`name.0001.rvt`) and temporary families (long hex names) are
    left out, and you can ignore any file by part of its name.
+7. **File activity.** The block also stores, per 5 minutes, how often each file
+   was named in the journal. With **File activity** ticked, day and week view
+   draw this as a strip on the right of each block: time runs downwards, one
+   stacked bar per 15 minutes, each file's share of that quarter-hour in its
+   colour (families grouped as one band). In day view, the note panel's
+   **File activity** section expands to the 5-minute detail with each file's
+   share of the block. A file keeps the same colour everywhere.
 
 ### Choosing the break threshold
 
@@ -130,6 +137,9 @@ pauses as work. 15 minutes is a fair middle and the default.
 4. Check the preview: per day, the active time, the blocks and their total.
    Hover over a day to see the notes its blocks will get.
 5. **Add to timesheet.** Blocks only go into empty time; anything already logged
-   is left as it is, and you're told how much overlapped.
+   is left as it is, and you're told how much overlapped. To import the same
+   journals again (for example after an update to this feature), tick
+   **Replace this label's existing time on these days**: that label's blocks on
+   those days are replaced by the new ones.
 
 Everything runs in your browser — the journals aren't uploaded anywhere.

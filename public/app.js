@@ -13,12 +13,14 @@ import { openJournalDialog } from './journalDialog.js';
 
 const FULL_DAY_SETTING = 'timesheet.fullDay';
 const SHOW_NOTES_SETTING = 'timesheet.weekShowNotes';
+const SHOW_ACTIVITY_SETTING = 'timesheet.showActivity';
 
 const state = {
   view: 'day',
   date: today(),
   fullDay: localStorage.getItem(FULL_DAY_SETTING) === 'true',
   showNotes: localStorage.getItem(SHOW_NOTES_SETTING) !== 'false', // on unless switched off
+  showActivity: localStorage.getItem(SHOW_ACTIVITY_SETTING) !== 'false',
 };
 
 const viewContainer = document.getElementById('view');
@@ -27,6 +29,8 @@ const fullDayToggle = document.getElementById('fullDayToggle');
 const fullDayCheckbox = document.getElementById('fullDayCheckbox');
 const showNotesToggle = document.getElementById('showNotesToggle');
 const showNotesCheckbox = document.getElementById('showNotesCheckbox');
+const showActivityToggle = document.getElementById('showActivityToggle');
+const showActivityCheckbox = document.getElementById('showActivityCheckbox');
 const saveStatus = document.getElementById('saveStatus');
 
 function openDay(date) {
@@ -75,8 +79,11 @@ function render() {
   });
   fullDayToggle.style.visibility = state.view === 'day' || state.view === 'week' ? 'visible' : 'hidden';
   showNotesToggle.style.display = state.view === 'week' ? '' : 'none';
+  showActivityToggle.style.display = state.view === 'day' || state.view === 'week' ? '' : 'none';
 
-  const options = { fullDay: state.fullDay, showNotes: state.showNotes, openDay, openMonth, rerender: render };
+  const options = {
+    fullDay: state.fullDay, showNotes: state.showNotes, showActivity: state.showActivity, openDay, openMonth, rerender: render,
+  };
   if (state.view === 'day') renderDayView(viewContainer, state.date, options);
   else if (state.view === 'week') renderWeekView(viewContainer, state.date, options);
   else if (state.view === 'month') renderMonthView(viewContainer, state.date, options);
@@ -106,6 +113,13 @@ function wireToolbar() {
   document.getElementById('nextButton').addEventListener('click', () => step(1));
   document.getElementById('todayButton').addEventListener('click', () => {
     state.date = today();
+    render();
+  });
+
+  showActivityCheckbox.checked = state.showActivity;
+  showActivityCheckbox.addEventListener('change', () => {
+    state.showActivity = showActivityCheckbox.checked;
+    localStorage.setItem(SHOW_ACTIVITY_SETTING, String(state.showActivity));
     render();
   });
 

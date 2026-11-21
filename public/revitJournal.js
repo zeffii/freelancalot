@@ -105,9 +105,18 @@ export function analyseJournals(journals, options) {
     }
   }
 
+  const mentionsByDay = new Map();
+  for (const mention of mentions) {
+    const key = localDateKey(mention.time);
+    if (!mentionsByDay.has(key)) mentionsByDay.set(key, []);
+    mentionsByDay.get(key).push(mention);
+  }
   for (const day of days.values()) {
+    const dayMentions = mentionsByDay.get(day.key) ?? [];
     for (const block of day.blocks) {
-      block.note = blockNote(block.periods, mentions, options.includeFiles);
+      block.note = blockNote(block.periods, dayMentions, options.includeFiles);
+      const activity = blockActivity(block, dayMentions);
+      if (activity) block.activity = activity;
       delete block.periods;
     }
   }
@@ -131,6 +140,30 @@ function blockNote(periods, mentions, includeFiles) {
   if (models.length) note += `\nModels:\n${models.join('\n')}`;
   if (families.length) note += `\nFamilies:\n${families.join('\n')}`;
   return note;
+}
+
+const ACTIVITY_STEP_MINUTES = 5;
+
+// Which files were named in the journal in each 5-minute step of the block:
+// { start, binMinutes, files: [name], bins: [[count per file]] }, or null.
+function blockActivity(block, dayMentions) {
+  const stepCount = (block.end - block.start) / ACTIVITY_STEP_MINUTES;
+  const fileIndex = new Map();
+  const steps = Array.from({ length: stepCount }, () => new Map());
+  for (const { time, name } of dayMentions) {
+    const step = Math.floor((minutesOfDay(time) - block.start) / ACTIVITY_STEP_MINUTES);
+    if (step < 0 || step >= stepCount) continue;
+    if (!fileIndex.has(name)) fileIndex.set(name, fileIndex.size);
+    const index = fileIndex.get(name);
+    steps[step].set(index, (steps[step].get(index) ?? 0) + 1);
+  }
+  if (fileIndex.size === 0) return null;
+  return {
+    start: block.start,
+    binMinutes: ACTIVITY_STEP_MINUTES,
+    files: [...fileIndex.keys()],
+    bins: steps.map((counts) => Array.from({ length: fileIndex.size }, (_, index) => counts.get(index) ?? 0)),
+  };
 }
 
 export function journalDateRange(journals) {
